@@ -47,3 +47,44 @@ pub(crate) enum Token {
     #[regex(r"[a-zA-Z_][a-zA-Z_0-9]*")]
     Identifier,
 }
+
+#[cfg(test)]
+mod tests {
+    macro_rules! lex_test {
+        ($testname:ident, $input:literal, [ $($token:ident)* ]) => {
+            #[test]
+            fn $testname() {
+                use crate::lex::Token;
+                use logos::Logos;
+                let mut lex = Token::lexer($input);
+                {
+                    use Token::*;
+                    $(
+                        assert_eq!(lex.next(), Some(Ok($token)));
+                    )*
+                }
+                assert_eq!(lex.next(), None);
+            }
+        };
+    }
+
+    mod single_token {
+        lex_test!(comma, ",", [Comma]);
+        lex_test!(colon, ":", [Colon]);
+        lex_test!(semicolon, ";", [Semicolon]);
+        lex_test!(rightarrow, "->", [RightArrow]);
+        lex_test!(singleequals, "=", [SingleEquals]);
+        lex_test!(doubleequals, "==", [DoubleEquals]);
+        lex_test!(plus, "+", [Plus]);
+        lex_test!(minus, "-", [Minus]);
+        lex_test!(asterisk, "*", [Asterisk]);
+        lex_test!(slash, "/", [Slash]);
+        lex_test!(atsign, "@", [AtSign]);
+        lex_test!(openbracket, "[", [OpenBracket]);
+        lex_test!(closebracket, "]", [CloseBracket]);
+        lex_test!(opencurly, "{", [OpenCurly]);
+        lex_test!(closecurly, "}", [CloseCurly]);
+        lex_test!(openparen, "(", [OpenParen]);
+        lex_test!(closeparen, ")", [CloseParen]);
+    }
+}
