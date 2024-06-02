@@ -4,4 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+byteyarn = "0.5.1"
+ctreg = "1.0.2"
 logos = "0.14.0"
+winnow = "0.6.9"

@@ -1,5 +1,14 @@
+// use winnow::Parser as _;
+
+use logos::Logos;
+
 mod lex;
+mod parse;
+mod ast;
 
 fn main() {
-    println!("Hello, world!");
+    let input = "hello world 123";
+    let lex = lex::Token::lexer(input);
+    let tokens: Vec<_> = lex.collect();
+    dbg!(tokens);
 }
