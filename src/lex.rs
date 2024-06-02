@@ -65,17 +65,6 @@ pub(crate) enum Token {
     Identifier,
 }
 
-// ctreg::regex!{
-//     pub NumberTokenPattern = r"(?x)
-// #### base prefix ####
-// # (TODO)
-// #### the number itself ####
-// [+\-]?  # sign
-// [0-9]+  # the number
-// #### type suffix ####
-// (?:[ui](?:8|16|32|64))
-// "
-// }
 ctreg::regex! {
     pub NumberTokenPattern = r"(?x)
 ##########  vvv IMPORTANT vvv  ###########
