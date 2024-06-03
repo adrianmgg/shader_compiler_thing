@@ -66,19 +66,10 @@ impl<'source> winnow::stream::Stream for LexerDriver<'source> {
 
 // ================================================================================
 
-impl<'source, I, E> winnow::Parser<I, LexResult<'source>, E> for Token<'source>
-where
-    I: winnow::stream::Stream<Token = LexResult<'source>> + winnow::stream::StreamIsPartial,
-    E: winnow::error::ParserError<I>,
-{
-    fn parse_next(&mut self, input: &mut I) -> PResult<LexResult<'source>, E> {
-        winnow::token::any
-            .verify(|t: &LexResult<'source>| t.token == *self)
-            .parse_next(input)
-    }
-}
-
-// ================================================================================
+// TODO probably factor `&mut &[LexResult<'source>]` into a type alias or smth so we can swap it
+//      out easier
+// TODO ^ same goes for our PResult since that'll probably change once weve got a custom err type
+//      maybe
 
 pub(crate) mod token {
     use winnow::{PResult, Parser};
@@ -87,9 +78,11 @@ pub(crate) mod token {
 
     use super::LexResult;
 
-    pub(crate) fn identifier<'source>(
-        i: &mut &[LexResult<'source>],
-    ) -> PResult<ast::Identifier<'source>> {
+    pub(crate) fn identifier<'source, I, E>(i: &mut I) -> PResult<ast::Identifier<'source>, E>
+    where
+        I: winnow::stream::Stream<Token = LexResult<'source>> + winnow::stream::StreamIsPartial,
+        E: winnow::error::ParserError<I>,
+    {
         winnow::token::any
             .verify_map(|t: LexResult<'source>| match t.token {
                 Token::Identifier(yarn) => Some(ast::Identifier::new(yarn)),
@@ -98,7 +91,11 @@ pub(crate) mod token {
             .parse_next(i)
     }
 
-    pub(crate) fn number<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Number> {
+    pub(crate) fn number<'source, I, E>(i: &mut I) -> PResult<ast::Number, E>
+    where
+        I: winnow::stream::Stream<Token = LexResult<'source>> + winnow::stream::StreamIsPartial,
+        E: winnow::error::ParserError<I>,
+    {
         winnow::token::any
             .verify_map(|t: LexResult<'_>| match t.token {
                 Token::Number(val) => Some(ast::Number { val }),
@@ -109,7 +106,12 @@ pub(crate) mod token {
 
     macro_rules! simple_token_parsefn {
         ($token:path, $fnname:ident) => {
-            pub(crate) fn $fnname<'source>(i: &mut &[LexResult<'source>]) -> PResult<()> {
+            pub(crate) fn $fnname<'source, I, E>(i: &mut I) -> PResult<(), E>
+            where
+                I: winnow::stream::Stream<Token = LexResult<'source>>
+                    + winnow::stream::StreamIsPartial,
+                E: winnow::error::ParserError<I>,
+            {
                 // TODO is there a way i should be doing this other than with token::any
                 winnow::token::any
                     .verify_map(|t: LexResult<'source>| match t.token {
