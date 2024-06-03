@@ -131,7 +131,7 @@ pub(crate) mod token {
             }
         };
     }
-    crate::lex::each_simple_token!(simple_token_parsefn);
+    crate::lex::for_each_simple_token!(simple_token_parsefn);
 
     #[cfg(test)]
     mod tests {
@@ -144,9 +144,15 @@ pub(crate) mod token {
                 );
             };
         }
-        crate::lex::each_simple_token!(simple_token_parsefn_tester);
-        crate::parse::tests::should_parse_test!(identifier, crate::parse::token::identifier, "foo");
-        crate::parse::tests::should_parse_test!(number, crate::parse::token::number, "10x12345u32");
+        crate::lex::for_each_simple_token!(simple_token_parsefn_tester);
+        crate::parse::tests::should_parse_to_test!(
+            identifier,
+            crate::parse::token::identifier,
+            "foo",
+            Ok(crate::ast::Identifier::new("foo".into()))
+        );
+        use crate::ast::{Number, Identifier};
+        crate::parse::tests::should_parse_to_test!(number, crate::parse::token::number, "10x12345u32", Ok(Number { val: 12345u32.into() }));
     }
 }
 
@@ -190,11 +196,38 @@ mod tests {
                 use winnow::Parser;
                 let tokens: Vec<crate::parse::LexResult<'_>> = crate::lex::Token::lexer($teststr)
                     .spanned()
-                    .map(|(tok, range)| (tok.unwrap(), range).into())
+                    .map(|(tok, range)| (tok.expect("lexing failed"), range).into())
                     .collect();
                 $parser.map(|_| ()).parse_next(&mut tokens.as_slice())
             }
         };
     }
     pub(crate) use should_parse_test;
+    macro_rules! should_parse_to_test {
+        ($testname:ident, $parser:expr, $teststr:literal, $expected_result:expr, $errtype:path) => {
+            #[test]
+            fn $testname() {
+                use logos::Logos;
+                use winnow::Parser;
+                let tokens: Vec<crate::parse::LexResult<'_>> = crate::lex::Token::lexer($teststr)
+                    .spanned()
+                    .map(|(tok, range)| (tok.expect("lexing failed"), range).into())
+                    .collect();
+                let parse_result: winnow::PResult<_, $errtype> =
+                    $parser.parse_next(&mut tokens.as_slice());
+                assert_eq!(parse_result, $expected_result);
+            }
+        };
+        // default $errtype to PResult's default
+        ($testname:ident, $parser:expr, $teststr:literal, $expected_result:expr) => {
+            $crate::parse::tests::should_parse_to_test!(
+                $testname,
+                $parser,
+                $teststr,
+                $expected_result,
+                winnow::error::ContextError
+            );
+        };
+    }
+    pub(crate) use should_parse_to_test;
 }

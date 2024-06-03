@@ -203,23 +203,48 @@ fn number_token_callback<'source>(
         .map_err(|_| ())
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub(crate) enum NumberData {
-    UnsignedInt8(u8),
-    UnsignedInt16(u16),
-    UnsignedInt32(u32),
-    UnsignedInt64(u64),
-    SignedInt8(i8),
-    SignedInt16(i16),
-    SignedInt32(i32),
-    SignedInt64(i64),
+macro_rules! for_each_numberdata_variant {
+    ($macro:path) => {
+        $macro!(
+            (UnsignedInt8, u8),
+            (UnsignedInt16, u16),
+            (UnsignedInt32, u32),
+            (UnsignedInt64, u64),
+            (SignedInt8, i8),
+            (SignedInt16, i16),
+            (SignedInt32, i32),
+            (SignedInt64, i64)
+        );
+    };
 }
+macro_rules! _mk_numberdata_enum {
+    ($(($variantname:ident, $valtype:ty)),*) => {
+        #[derive(Debug, PartialEq, Eq, Clone)]
+        pub(crate) enum NumberData {
+            $($variantname($valtype),)*
+        }
+    };
+}
+for_each_numberdata_variant!(_mk_numberdata_enum);
+
+macro_rules! _mk_numberdata_impls {
+    ($(($variantname:ident, $valtype:ty)),*) => {
+        $(
+            impl From<$valtype> for NumberData {
+                fn from(value: $valtype) -> Self {
+                    NumberData::$variantname(value)
+                }
+            }
+        )*
+    };
+}
+for_each_numberdata_variant!(_mk_numberdata_impls);
 
 /// given a macro, call said macro with info pertaining to each 'simple' (i.e. value-free) token.
 ///
 /// provided macro should accept `(ident, path, literal)`.
 /// it will be called with e.g. `slash, crate::lex::Token::Slash, "/"`
-macro_rules! each_simple_token {
+macro_rules! for_each_simple_token {
     ($macro:ident) => {
         $macro!(comma, $crate::lex::Token::Comma, ",");
         $macro!(colon, $crate::lex::Token::Colon, ":");
@@ -240,7 +265,7 @@ macro_rules! each_simple_token {
         $macro!(closeparen, $crate::lex::Token::CloseParen, ")");
     };
 }
-pub(crate) use each_simple_token;
+pub(crate) use for_each_simple_token;
 
 #[cfg(test)]
 mod tests {
@@ -267,7 +292,7 @@ mod tests {
                 lex_test!($name, $str, [$tok]);
             };
         }
-        crate::lex::each_simple_token!(simple_token_lex_test);
+        crate::lex::for_each_simple_token!(simple_token_lex_test);
     }
 
     mod numbers {

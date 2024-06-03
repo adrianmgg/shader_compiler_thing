@@ -1,6 +1,7 @@
 // TODO move this alias elsewhere
 pub(crate) type YarnStr<'s> = byteyarn::YarnBox<'s, str>;
 
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Identifier<'s> {
     pub(crate) name: YarnStr<'s>,
 }
@@ -11,10 +12,12 @@ impl<'s> Identifier<'s> {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Number {
     pub(crate) val: crate::lex::NumberData,
 }
 
+#[derive(Debug)]
 pub(crate) struct Function<'s> {
     pub(crate) name: Identifier<'s>,
     pub(crate) args: FunctionArgs<'s>,
@@ -25,14 +28,17 @@ pub(crate) struct Function<'s> {
 // TODO make this a proper struct instead probably
 pub(crate) type FunctionArgs<'s> = Vec<(Identifier<'s>, Type<'s>)>;
 
+#[derive(Debug)]
 pub(crate) enum Type<'s> {
     Named(Identifier<'s>),
 }
 
+#[derive(Debug)]
 pub(crate) struct StatementList<'s> {
     pub statements: Vec<Statement<'s>>,
 }
 
+#[derive(Debug)]
 pub(crate) enum Statement<'s> {
     Assign {
         target: LValue<'s>,
@@ -46,10 +52,12 @@ pub(crate) enum Statement<'s> {
     },
 }
 
+#[derive(Debug)]
 pub(crate) struct LValue<'s> {
     _todo: std::marker::PhantomData<&'s ()>,
 }
 
+#[derive(Debug)]
 pub(crate) enum Expression<'s> {
     VariableReference(Identifier<'s>),
     Number(Number),
@@ -65,6 +73,7 @@ pub(crate) enum Expression<'s> {
     },
 }
 
+#[derive(Debug)]
 pub(crate) enum BinaryInfixOp {
     /// addition
     Add,
