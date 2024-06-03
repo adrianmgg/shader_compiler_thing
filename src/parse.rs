@@ -105,7 +105,7 @@ pub(crate) mod token {
     }
 
     macro_rules! simple_token_parsefn {
-        ($token:path, $fnname:ident) => {
+        ($fnname:ident, $token:path, $_:literal) => {
             pub(crate) fn $fnname<'source, I, E>(i: &mut I) -> PResult<(), E>
             where
                 I: winnow::stream::Stream<Token = LexResult<'source>>
@@ -122,24 +122,7 @@ pub(crate) mod token {
             }
         };
     }
-
-    simple_token_parsefn!(Token::Comma, comma);
-    simple_token_parsefn!(Token::Colon, colon);
-    simple_token_parsefn!(Token::Semicolon, semicolon);
-    simple_token_parsefn!(Token::RightArrow, rightarrow);
-    simple_token_parsefn!(Token::SingleEquals, singleequals);
-    simple_token_parsefn!(Token::DoubleEquals, doubleequals);
-    simple_token_parsefn!(Token::Plus, plus);
-    simple_token_parsefn!(Token::Minus, minus);
-    simple_token_parsefn!(Token::Asterisk, asterisk);
-    simple_token_parsefn!(Token::Slash, slash);
-    simple_token_parsefn!(Token::AtSign, atsign);
-    simple_token_parsefn!(Token::OpenBracket, openbracket);
-    simple_token_parsefn!(Token::CloseBracket, closebracket);
-    simple_token_parsefn!(Token::OpenCurly, opencurly);
-    simple_token_parsefn!(Token::CloseCurly, closecurly);
-    simple_token_parsefn!(Token::OpenParen, openparen);
-    simple_token_parsefn!(Token::CloseParen, closeparen);
+    crate::lex::each_simple_token!(simple_token_parsefn);
 }
 
 pub(crate) fn function<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Function<'source>> {

@@ -215,6 +215,33 @@ pub(crate) enum NumberData {
     SignedInt64(i64),
 }
 
+/// given a macro, call said macro with info pertaining to each 'simple' (i.e. value-free) token.
+///
+/// provided macro should accept `(ident, path, literal)`.
+/// it will be called with e.g. `slash, crate::lex::Token::Slash, "/"`
+macro_rules! each_simple_token {
+    ($macro:ident) => {
+        $macro!(comma, $crate::lex::Token::Comma, ",");
+        $macro!(colon, $crate::lex::Token::Colon, ":");
+        $macro!(semicolon, $crate::lex::Token::Semicolon, ";");
+        $macro!(rightarrow, $crate::lex::Token::RightArrow, "->");
+        $macro!(singleequals, $crate::lex::Token::SingleEquals, "=");
+        $macro!(doubleequals, $crate::lex::Token::DoubleEquals, "==");
+        $macro!(plus, $crate::lex::Token::Plus, "+");
+        $macro!(minus, $crate::lex::Token::Minus, "-");
+        $macro!(asterisk, $crate::lex::Token::Asterisk, "*");
+        $macro!(slash, $crate::lex::Token::Slash, "/");
+        $macro!(atsign, $crate::lex::Token::AtSign, "@");
+        $macro!(openbracket, $crate::lex::Token::OpenBracket, "[");
+        $macro!(closebracket, $crate::lex::Token::CloseBracket, "]");
+        $macro!(opencurly, $crate::lex::Token::OpenCurly, "{");
+        $macro!(closecurly, $crate::lex::Token::CloseCurly, "}");
+        $macro!(openparen, $crate::lex::Token::OpenParen, "(");
+        $macro!(closeparen, $crate::lex::Token::CloseParen, ")");
+    };
+}
+pub(crate) use each_simple_token;
+
 #[cfg(test)]
 mod tests {
     macro_rules! lex_test {
@@ -225,7 +252,6 @@ mod tests {
                 use logos::Logos;
                 let mut lex = Token::lexer($input);
                 {
-                    use Token::*;
                     $(
                         assert_eq!(lex.next(), Some(Ok($token)));
                     )*
@@ -236,27 +262,16 @@ mod tests {
     }
 
     mod simple_tokens {
-        lex_test!(comma, ",", [Comma]);
-        lex_test!(colon, ":", [Colon]);
-        lex_test!(semicolon, ";", [Semicolon]);
-        lex_test!(rightarrow, "->", [RightArrow]);
-        lex_test!(singleequals, "=", [SingleEquals]);
-        lex_test!(doubleequals, "==", [DoubleEquals]);
-        lex_test!(plus, "+", [Plus]);
-        lex_test!(minus, "-", [Minus]);
-        lex_test!(asterisk, "*", [Asterisk]);
-        lex_test!(slash, "/", [Slash]);
-        lex_test!(atsign, "@", [AtSign]);
-        lex_test!(openbracket, "[", [OpenBracket]);
-        lex_test!(closebracket, "]", [CloseBracket]);
-        lex_test!(opencurly, "{", [OpenCurly]);
-        lex_test!(closecurly, "}", [CloseCurly]);
-        lex_test!(openparen, "(", [OpenParen]);
-        lex_test!(closeparen, ")", [CloseParen]);
+        macro_rules! simple_token_lex_test {
+            ($name:ident, $tok:path, $str:literal) => {
+                lex_test!($name, $str, [$tok]);
+            };
+        }
+        crate::lex::each_simple_token!(simple_token_lex_test);
     }
 
     mod numbers {
-        use crate::lex::NumberData;
+        use crate::lex::{NumberData, Token::*};
         lex_test!(
             implicit_base,
             "12u32",
@@ -269,5 +284,8 @@ mod tests {
         );
     }
 
-    lex_test!(identifier, "foo", [Identifier("foo".into())]);
+    mod identifiers {
+        use crate::lex::Token::*;
+        lex_test!(simple, "foo", [Identifier("foo".into())]);
+    }
 }
