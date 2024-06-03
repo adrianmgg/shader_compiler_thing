@@ -2,7 +2,7 @@ use crate::{
     ast::{self, YarnStr},
     lex::Token,
 };
-use winnow::{PResult, Parser};
+use winnow::{combinator::seq, PResult, Parser};
 
 #[derive(Debug, PartialEq, Clone)]
 // TODO rename this better
@@ -138,4 +138,34 @@ pub(crate) mod token {
     simple_token_parsefn!(Token::CloseCurly, closecurly);
     simple_token_parsefn!(Token::OpenParen, openparen);
     simple_token_parsefn!(Token::CloseParen, closeparen);
+}
+
+pub(crate) fn function<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Function<'source>> {
+    use ast::Function;
+    seq! {Function{
+        name: token::identifier,
+        _: token::openparen,
+        args: function_args,
+        _: token::closeparen,
+        _: token::rightarrow,
+        return_type: r#type,
+        _: token::opencurly,
+        statements: statement_list,
+        _: token::closecurly,
+    }}
+    .parse_next(i)
+}
+
+fn function_args<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::FunctionArgs<'source>> {
+    todo!()
+}
+
+pub(crate) fn r#type<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Type<'source>> {
+    todo!()
+}
+
+pub(crate) fn statement_list<'source>(
+    i: &mut &[LexResult<'source>],
+) -> PResult<ast::StatementList<'source>> {
+    todo!()
 }
