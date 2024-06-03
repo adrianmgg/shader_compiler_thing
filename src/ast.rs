@@ -11,13 +11,6 @@ impl<'s> Identifier<'s> {
     }
 }
 
-pub(crate) enum Number {
-    Signed8 { value: i8 },
-    Signed16 { value: i16 },
-    Signed32 { value: i32 },
-    Signed64 { value: i64 },
-    Unsigned8 { value: u8 },
-    Unsigned16 { value: u16 },
-    Unsigned32 { value: u32 },
-    Unsigned64 { value: u64 },
+pub(crate) struct Number {
+    pub(crate) val: crate::lex::NumberData,
 }

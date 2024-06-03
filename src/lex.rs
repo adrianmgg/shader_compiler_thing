@@ -235,7 +235,7 @@ mod tests {
         };
     }
 
-    mod single_token {
+    mod simple_tokens {
         lex_test!(comma, ",", [Comma]);
         lex_test!(colon, ":", [Colon]);
         lex_test!(semicolon, ";", [Semicolon]);
@@ -268,4 +268,6 @@ mod tests {
             [Number(NumberData::UnsignedInt8(0xffu8))]
         );
     }
+
+    lex_test!(identifier, "foo", [Identifier("foo".into())]);
 }

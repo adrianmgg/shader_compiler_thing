@@ -80,23 +80,62 @@ where
 
 // ================================================================================
 
-pub(crate) fn identifier<'source>(
-    i: &mut &[LexResult<'source>],
-) -> PResult<ast::Identifier<'source>> {
-    winnow::token::any
-        .verify_map(|t: LexResult<'source>| match t.token {
-            Token::Identifier(yarn) => Some(ast::Identifier::new(yarn)),
-            _ => None,
-        })
-        .parse_next(i)
-}
+pub(crate) mod token {
+    use winnow::{PResult, Parser};
 
-pub(crate) fn number<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Number> {
-    todo!()
-    // Token::Number
-    //     .map(|r| {
-    //         // (we basically need to fully parse the number again here since the lexer only gives
-    //         //  us one overall token for the whole literal)
-    //     })
-    //     .parse_next(i)
+    use crate::{ast, lex::Token};
+
+    use super::LexResult;
+
+    pub(crate) fn identifier<'source>(
+        i: &mut &[LexResult<'source>],
+    ) -> PResult<ast::Identifier<'source>> {
+        winnow::token::any
+            .verify_map(|t: LexResult<'source>| match t.token {
+                Token::Identifier(yarn) => Some(ast::Identifier::new(yarn)),
+                _ => None,
+            })
+            .parse_next(i)
+    }
+
+    pub(crate) fn number<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Number> {
+        winnow::token::any
+            .verify_map(|t: LexResult<'_>| match t.token {
+                Token::Number(val) => Some(ast::Number { val }),
+                _ => None,
+            })
+            .parse_next(i)
+    }
+
+    macro_rules! simple_token_parsefn {
+        ($token:path, $fnname:ident) => {
+            pub(crate) fn $fnname<'source>(i: &mut &[LexResult<'source>]) -> PResult<()> {
+                // TODO is there a way i should be doing this other than with token::any
+                winnow::token::any
+                    .verify_map(|t: LexResult<'source>| match t.token {
+                        $token => Some(()),
+                        _ => None,
+                    })
+                    .parse_next(i)
+            }
+        };
+    }
+
+    simple_token_parsefn!(Token::Comma, comma);
+    simple_token_parsefn!(Token::Colon, colon);
+    simple_token_parsefn!(Token::Semicolon, semicolon);
+    simple_token_parsefn!(Token::RightArrow, rightarrow);
+    simple_token_parsefn!(Token::SingleEquals, singleequals);
+    simple_token_parsefn!(Token::DoubleEquals, doubleequals);
+    simple_token_parsefn!(Token::Plus, plus);
+    simple_token_parsefn!(Token::Minus, minus);
+    simple_token_parsefn!(Token::Asterisk, asterisk);
+    simple_token_parsefn!(Token::Slash, slash);
+    simple_token_parsefn!(Token::AtSign, atsign);
+    simple_token_parsefn!(Token::OpenBracket, openbracket);
+    simple_token_parsefn!(Token::CloseBracket, closebracket);
+    simple_token_parsefn!(Token::OpenCurly, opencurly);
+    simple_token_parsefn!(Token::CloseCurly, closecurly);
+    simple_token_parsefn!(Token::OpenParen, openparen);
+    simple_token_parsefn!(Token::CloseParen, closeparen);
 }
