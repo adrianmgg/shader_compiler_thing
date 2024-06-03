@@ -1,5 +1,3 @@
-// use winnow::Parser as _;
-
 use logos::Logos;
 
 mod lex;

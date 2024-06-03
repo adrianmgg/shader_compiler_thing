@@ -92,6 +92,50 @@ $  # end of input (DO NOT include this in the lexer's copy of the regex)
 "
 }
 
+/// calls provided macro with comma separated paren-wrapped pairs containing, in order:
+/// - number of the base (`literal`)
+/// - associated internal variant name (`ident`)
+macro_rules! for_each_supported_num_base {
+    ($macro:tt) => {
+        $macro!(
+            (2, B2),
+            (3, B3),
+            (4, B4),
+            (5, B5),
+            (6, B6),
+            (7, B7),
+            (8, B8),
+            (9, B9),
+            (10, B10),
+            (11, B11),
+            (12, B12),
+            (13, B13),
+            (14, B14),
+            (15, B15),
+            (16, B16)
+        );
+    };
+}
+
+/// calls provided macro with comma separated paren-wrapped pairs containing, in order:
+/// - associated rust type (`ty`)
+/// - corresponding [`NumberData`] variant name (`ident`)
+/// - suffix used to mark literals as that type, as a string (`literal`)
+macro_rules! for_each_supported_number_type {
+    ($macro:tt) => {
+        $macro!(
+            (u8, UnsignedInt8, "u8"),
+            (u16, UnsignedInt16, "u16"),
+            (u32, UnsignedInt32, "u32"),
+            (u64, UnsignedInt64, "u64"),
+            (i8, SignedInt8, "i8"),
+            (i16, SignedInt16, "i16"),
+            (i32, SignedInt32, "i32"),
+            (i64, SignedInt64, "i64")
+        );
+    };
+}
+
 fn number_token_callback<'source>(
     lex: &mut logos::Lexer<'source, Token<'source>>,
 ) -> Result<NumberData, ()> {
@@ -100,102 +144,58 @@ fn number_token_callback<'source>(
     // TODO don't unwrap here
     let capture = number_token_pattern.captures(lex.slice()).unwrap();
 
-    enum NumBase {
-        B2,
-        B3,
-        B4,
-        B5,
-        B6,
-        B7,
-        B8,
-        B9,
-        B10,
-        B11,
-        B12,
-        B13,
-        B14,
-        B15,
-        B16,
-    }
-    impl NumBase {
-        fn radix(&self) -> u32 {
-            match self {
-                Self::B2 => 2,
-                Self::B3 => 3,
-                Self::B4 => 4,
-                Self::B5 => 5,
-                Self::B6 => 6,
-                Self::B7 => 7,
-                Self::B8 => 8,
-                Self::B9 => 9,
-                Self::B10 => 10,
-                Self::B11 => 11,
-                Self::B12 => 12,
-                Self::B13 => 13,
-                Self::B14 => 14,
-                Self::B15 => 15,
-                Self::B16 => 16,
+    macro_rules! _mk_numbase {
+        ($(($base:literal, $variant:ident)),*) => {
+            enum NumBase {
+                $($variant,)*
             }
-        }
-    }
-    enum NumType {
-        I8,
-        I16,
-        I32,
-        I64,
-        U8,
-        U16,
-        U32,
-        U64,
-    }
-    impl NumType {
-        fn parse(&self, src: &str, radix: u32) -> Result<NumberData, std::num::ParseIntError> {
-            match self {
-                Self::I8 => i8::from_str_radix(src, radix).map(NumberData::SignedInt8),
-                Self::I16 => i16::from_str_radix(src, radix).map(NumberData::SignedInt16),
-                Self::I32 => i32::from_str_radix(src, radix).map(NumberData::SignedInt32),
-                Self::I64 => i64::from_str_radix(src, radix).map(NumberData::SignedInt64),
-                Self::U8 => u8::from_str_radix(src, radix).map(NumberData::UnsignedInt8),
-                Self::U16 => u16::from_str_radix(src, radix).map(NumberData::UnsignedInt16),
-                Self::U32 => u32::from_str_radix(src, radix).map(NumberData::UnsignedInt32),
-                Self::U64 => u64::from_str_radix(src, radix).map(NumberData::UnsignedInt64),
+            impl NumBase {
+                fn radix(&self) -> u32 {
+                    match self {
+                        $(Self::$variant => $base,)*
+                    }
+                }
+                fn from_prefix_str(base_prefix: &str) -> Self {
+                    match base_prefix {
+                        $(
+                            concat!(stringify!($base), "x") => NumBase::$variant,
+                        )*
+                        _ => panic!(),
+                    }
+                }
             }
-        }
+        };
     }
+    for_each_supported_num_base!(_mk_numbase);
+
+    macro_rules! _mk_numtype {
+        ($(($typ:ty, $variant:ident, $suffix:literal)),*) => {
+            enum NumType {
+                $($variant,)*
+            }
+            impl NumType {
+                fn parse(&self, src: &str, radix: u32) -> Result<NumberData, std::num::ParseIntError> {
+                    match self {
+                        $(Self::$variant => <$typ>::from_str_radix(src, radix).map(NumberData::$variant),)*
+                    }
+                }
+                fn from_suffix_str(type_suffix: &str) -> Self {
+                    match type_suffix {
+                        $($suffix => NumType::$variant,)*
+                        _ => panic!(),
+                    }
+                }
+            }
+        };
+    }
+    for_each_supported_number_type!(_mk_numtype);
 
     let base = match capture.base_prefix {
         None => NumBase::B10,
-        Some(base_prefix) => match base_prefix.content {
-            "2x" => NumBase::B2,
-            "3x" => NumBase::B3,
-            "4x" => NumBase::B4,
-            "5x" => NumBase::B5,
-            "6x" => NumBase::B6,
-            "7x" => NumBase::B7,
-            "8x" => NumBase::B8,
-            "9x" => NumBase::B9,
-            "10x" => NumBase::B10,
-            "11x" => NumBase::B11,
-            "12x" => NumBase::B12,
-            "13x" => NumBase::B13,
-            "14x" => NumBase::B14,
-            "15x" => NumBase::B15,
-            "16x" => NumBase::B16,
-            _ => panic!(),
-        },
+        Some(base_prefix) => NumBase::from_prefix_str(base_prefix.content),
     };
 
-    let r#type = match capture.type_suffix.content {
-        "u8" => NumType::U8,
-        "u16" => NumType::U16,
-        "u32" => NumType::U32,
-        "u64" => NumType::U64,
-        "i8" => NumType::I8,
-        "i16" => NumType::I16,
-        "i32" => NumType::I32,
-        "i64" => NumType::I64,
-        _ => panic!(),
-    };
+    let r#type = NumType::from_suffix_str(capture.type_suffix.content);
 
     // TODO actually have proper errors here
     r#type
@@ -203,32 +203,12 @@ fn number_token_callback<'source>(
         .map_err(|_| ())
 }
 
-macro_rules! for_each_numberdata_variant {
-    ($macro:path) => {
-        $macro!(
-            (UnsignedInt8, u8),
-            (UnsignedInt16, u16),
-            (UnsignedInt32, u32),
-            (UnsignedInt64, u64),
-            (SignedInt8, i8),
-            (SignedInt16, i16),
-            (SignedInt32, i32),
-            (SignedInt64, i64)
-        );
-    };
-}
 macro_rules! _mk_numberdata_enum {
-    ($(($variantname:ident, $valtype:ty)),*) => {
+    ($(($valtype:ty, $variantname:ident, $_suffixstr:literal)),*) => {
         #[derive(Debug, PartialEq, Eq, Clone)]
         pub(crate) enum NumberData {
             $($variantname($valtype),)*
         }
-    };
-}
-for_each_numberdata_variant!(_mk_numberdata_enum);
-
-macro_rules! _mk_numberdata_impls {
-    ($(($variantname:ident, $valtype:ty)),*) => {
         $(
             impl From<$valtype> for NumberData {
                 fn from(value: $valtype) -> Self {
@@ -238,31 +218,30 @@ macro_rules! _mk_numberdata_impls {
         )*
     };
 }
-for_each_numberdata_variant!(_mk_numberdata_impls);
+for_each_supported_number_type!(_mk_numberdata_enum);
 
 /// given a macro, call said macro with info pertaining to each 'simple' (i.e. value-free) token.
-///
-/// provided macro should accept `(ident, path, literal)`.
-/// it will be called with e.g. `slash, crate::lex::Token::Slash, "/"`
 macro_rules! for_each_simple_token {
-    ($macro:ident) => {
-        $macro!(comma, $crate::lex::Token::Comma, ",");
-        $macro!(colon, $crate::lex::Token::Colon, ":");
-        $macro!(semicolon, $crate::lex::Token::Semicolon, ";");
-        $macro!(rightarrow, $crate::lex::Token::RightArrow, "->");
-        $macro!(singleequals, $crate::lex::Token::SingleEquals, "=");
-        $macro!(doubleequals, $crate::lex::Token::DoubleEquals, "==");
-        $macro!(plus, $crate::lex::Token::Plus, "+");
-        $macro!(minus, $crate::lex::Token::Minus, "-");
-        $macro!(asterisk, $crate::lex::Token::Asterisk, "*");
-        $macro!(slash, $crate::lex::Token::Slash, "/");
-        $macro!(atsign, $crate::lex::Token::AtSign, "@");
-        $macro!(openbracket, $crate::lex::Token::OpenBracket, "[");
-        $macro!(closebracket, $crate::lex::Token::CloseBracket, "]");
-        $macro!(opencurly, $crate::lex::Token::OpenCurly, "{");
-        $macro!(closecurly, $crate::lex::Token::CloseCurly, "}");
-        $macro!(openparen, $crate::lex::Token::OpenParen, "(");
-        $macro!(closeparen, $crate::lex::Token::CloseParen, ")");
+    ($macro:tt) => {
+        $macro!(
+            (comma, $crate::lex::Token::Comma, ","),
+            (colon, $crate::lex::Token::Colon, ":"),
+            (semicolon, $crate::lex::Token::Semicolon, ";"),
+            (rightarrow, $crate::lex::Token::RightArrow, "->"),
+            (singleequals, $crate::lex::Token::SingleEquals, "="),
+            (doubleequals, $crate::lex::Token::DoubleEquals, "=="),
+            (plus, $crate::lex::Token::Plus, "+"),
+            (minus, $crate::lex::Token::Minus, "-"),
+            (asterisk, $crate::lex::Token::Asterisk, "*"),
+            (slash, $crate::lex::Token::Slash, "/"),
+            (atsign, $crate::lex::Token::AtSign, "@"),
+            (openbracket, $crate::lex::Token::OpenBracket, "["),
+            (closebracket, $crate::lex::Token::CloseBracket, "]"),
+            (opencurly, $crate::lex::Token::OpenCurly, "{"),
+            (closecurly, $crate::lex::Token::CloseCurly, "}"),
+            (openparen, $crate::lex::Token::OpenParen, "("),
+            (closeparen, $crate::lex::Token::CloseParen, ")")
+        );
     };
 }
 pub(crate) use for_each_simple_token;
@@ -288,8 +267,8 @@ mod tests {
 
     mod simple_tokens {
         macro_rules! simple_token_lex_test {
-            ($name:ident, $tok:path, $str:literal) => {
-                lex_test!($name, $str, [$tok]);
+            ($(($name:ident, $tok:path, $str:literal)),*) => {
+                $(lex_test!($name, $str, [$tok]);)*
             };
         }
         crate::lex::for_each_simple_token!(simple_token_lex_test);

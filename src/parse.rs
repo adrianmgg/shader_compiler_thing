@@ -114,8 +114,8 @@ pub(crate) mod token {
     }
 
     macro_rules! simple_token_parsefn {
-        ($fnname:ident, $token:path, $_:literal) => {
-            pub(crate) fn $fnname<'source, I, E>(i: &mut I) -> PResult<(), E>
+        ($(($fnname:ident, $token:path, $_:literal)),*) => {
+            $(pub(crate) fn $fnname<'source, I, E>(i: &mut I) -> PResult<(), E>
             where
                 I: winnow::stream::Stream<Token = LexResult<'source>>
                     + winnow::stream::StreamIsPartial,
@@ -128,7 +128,7 @@ pub(crate) mod token {
                         _ => None,
                     })
                     .parse_next(i)
-            }
+            })*
         };
     }
     crate::lex::for_each_simple_token!(simple_token_parsefn);
@@ -136,12 +136,12 @@ pub(crate) mod token {
     #[cfg(test)]
     mod tests {
         macro_rules! simple_token_parsefn_tester {
-            ($fnname:ident, $token:path, $tokenstr:literal) => {
-                $crate::parse::tests::should_parse_test!(
+            ($(($fnname:ident, $token:path, $tokenstr:literal)),*) => {
+                $($crate::parse::tests::should_parse_test!(
                     $fnname,
                     $crate::parse::token::$fnname,
                     $tokenstr
-                );
+                );)*
             };
         }
         crate::lex::for_each_simple_token!(simple_token_parsefn_tester);
@@ -151,8 +151,15 @@ pub(crate) mod token {
             "foo",
             Ok(crate::ast::Identifier::new("foo".into()))
         );
-        use crate::ast::{Number, Identifier};
-        crate::parse::tests::should_parse_to_test!(number, crate::parse::token::number, "10x12345u32", Ok(Number { val: 12345u32.into() }));
+        use crate::ast::{Identifier, Number};
+        crate::parse::tests::should_parse_to_test!(
+            number,
+            crate::parse::token::number,
+            "10x12345u32",
+            Ok(Number {
+                val: 12345u32.into()
+            })
+        );
     }
 }
 
