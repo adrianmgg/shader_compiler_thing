@@ -11,6 +11,15 @@ pub(crate) struct LexResult<'source> {
     pub(crate) span: logos::Span,
 }
 
+impl<'source> From<(crate::lex::Token<'source>, logos::Span)> for LexResult<'source> {
+    fn from(value: (crate::lex::Token<'source>, logos::Span)) -> Self {
+        LexResult {
+            token: value.0,
+            span: value.1,
+        }
+    }
+}
+
 impl winnow::stream::ContainsToken<LexResult<'_>> for LexResult<'_> {
     #[inline]
     fn contains_token(&self, token: LexResult) -> bool {
@@ -123,6 +132,22 @@ pub(crate) mod token {
         };
     }
     crate::lex::each_simple_token!(simple_token_parsefn);
+
+    #[cfg(test)]
+    mod tests {
+        macro_rules! simple_token_parsefn_tester {
+            ($fnname:ident, $token:path, $tokenstr:literal) => {
+                $crate::parse::tests::should_parse_test!(
+                    $fnname,
+                    $crate::parse::token::$fnname,
+                    $tokenstr
+                );
+            };
+        }
+        crate::lex::each_simple_token!(simple_token_parsefn_tester);
+        crate::parse::tests::should_parse_test!(identifier, crate::parse::token::identifier, "foo");
+        crate::parse::tests::should_parse_test!(number, crate::parse::token::number, "10x12345u32");
+    }
 }
 
 pub(crate) fn function<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Function<'source>> {
@@ -153,4 +178,23 @@ pub(crate) fn statement_list<'source>(
     i: &mut &[LexResult<'source>],
 ) -> PResult<ast::StatementList<'source>> {
     todo!()
+}
+
+#[cfg(test)]
+mod tests {
+    macro_rules! should_parse_test {
+        ($testname:ident, $parser:expr, $teststr:literal) => {
+            #[test]
+            fn $testname() -> winnow::PResult<()> {
+                use logos::Logos;
+                use winnow::Parser;
+                let tokens: Vec<crate::parse::LexResult<'_>> = crate::lex::Token::lexer($teststr)
+                    .spanned()
+                    .map(|(tok, range)| (tok.unwrap(), range).into())
+                    .collect();
+                $parser.map(|_| ()).parse_next(&mut tokens.as_slice())
+            }
+        };
+    }
+    pub(crate) use should_parse_test;
 }
