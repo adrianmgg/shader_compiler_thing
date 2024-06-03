@@ -249,7 +249,15 @@ mod tests {
 
     mod numbers {
         use crate::lex::NumberData;
-        lex_test!(implicit_base, "12u32", [Number(NumberData::UnsignedInt32(12u32))]);
-        lex_test!(explicit_base, "16xffu8", [Number(NumberData::UnsignedInt8(0xffu8))]);
+        lex_test!(
+            implicit_base,
+            "12u32",
+            [Number(NumberData::UnsignedInt32(12u32))]
+        );
+        lex_test!(
+            explicit_base,
+            "16xffu8",
+            [Number(NumberData::UnsignedInt8(0xffu8))]
+        );
     }
 }
