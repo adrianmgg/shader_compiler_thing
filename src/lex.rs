@@ -1,8 +1,10 @@
 use logos::Logos;
 
+use crate::ast::YarnStr;
+
 #[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(skip r"[ \t\n\f]+")]
-pub(crate) enum Token {
+pub(crate) enum Token<'source> {
     #[token(",")]
     Comma,
     #[token(":")]
@@ -60,8 +62,12 @@ pub(crate) enum Token {
     )]
     Number(NumberData),
 
-    #[regex(r"[a-zA-Z_][a-zA-Z_0-9]*")]
-    Identifier,
+    #[regex(r"[a-zA-Z_][a-zA-Z_0-9]*", identifier_callback)]
+    Identifier(YarnStr<'source>),
+}
+
+fn identifier_callback<'a>(lex: &mut logos::Lexer<'a, Token<'a>>) -> YarnStr<'a> {
+    YarnStr::new(lex.slice())
 }
 
 ctreg::regex! {
@@ -86,7 +92,9 @@ $  # end of input (DO NOT include this in the lexer's copy of the regex)
 "
 }
 
-fn number_token_callback(lex: &mut logos::Lexer<Token>) -> Result<NumberData, ()> {
+fn number_token_callback<'source>(
+    lex: &mut logos::Lexer<'source, Token<'source>>,
+) -> Result<NumberData, ()> {
     // TODO don't instance this every time lol
     let number_token_pattern = NumberTokenPattern::new();
     // TODO don't unwrap here

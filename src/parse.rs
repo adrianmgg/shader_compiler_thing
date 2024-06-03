@@ -7,9 +7,8 @@ use winnow::{PResult, Parser};
 #[derive(Debug, PartialEq, Clone)]
 // TODO rename this better
 pub(crate) struct LexResult<'source> {
-    pub(crate) token: crate::lex::Token,
+    pub(crate) token: crate::lex::Token<'source>,
     pub(crate) span: logos::Span,
-    pub(crate) slice: &'source str,
 }
 
 impl winnow::stream::ContainsToken<LexResult<'_>> for LexResult<'_> {
@@ -67,7 +66,7 @@ impl<'source> winnow::stream::Stream for LexerDriver<'source> {
 
 // ================================================================================
 
-impl<'source, I, E> winnow::Parser<I, LexResult<'source>, E> for Token
+impl<'source, I, E> winnow::Parser<I, LexResult<'source>, E> for Token<'source>
 where
     I: winnow::stream::Stream<Token = LexResult<'source>> + winnow::stream::StreamIsPartial,
     E: winnow::error::ParserError<I>,
@@ -84,8 +83,11 @@ where
 pub(crate) fn identifier<'source>(
     i: &mut &[LexResult<'source>],
 ) -> PResult<ast::Identifier<'source>> {
-    Token::Identifier
-        .map(|r| ast::Identifier::new(YarnStr::<'source>::new(r.slice)))
+    winnow::token::any
+        .verify_map(|t: LexResult<'source>| match t.token {
+            Token::Identifier(yarn) => Some(ast::Identifier::new(yarn)),
+            _ => None,
+        })
         .parse_next(i)
 }
 
