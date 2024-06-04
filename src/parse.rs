@@ -114,8 +114,9 @@ pub(crate) mod token {
     }
 
     macro_rules! simple_token_parsefn {
-        ($(($fnname:ident, $token:path, $_:literal)),*) => {
-            $(pub(crate) fn $fnname<'source, I, E>(i: &mut I) -> PResult<(), E>
+        ($(($fnname:ident, $token:path, $_:literal)),*) => {$(
+            #[allow(unused)]
+            pub(crate) fn $fnname<'source, I, E>(i: &mut I) -> PResult<(), E>
             where
                 I: winnow::stream::Stream<Token = LexResult<'source>>
                     + winnow::stream::StreamIsPartial,
@@ -128,8 +129,8 @@ pub(crate) mod token {
                         _ => None,
                     })
                     .parse_next(i)
-            })*
-        };
+            }
+        )*};
     }
     crate::lex::for_each_simple_token!(simple_token_parsefn);
 

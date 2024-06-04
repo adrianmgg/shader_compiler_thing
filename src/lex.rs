@@ -92,6 +92,8 @@ $  # end of input (DO NOT include this in the lexer's copy of the regex)
 "
 }
 
+/// given a macro, call said macro with info pertaining to each base/radix supported by the lexer
+///
 /// calls provided macro with comma separated paren-wrapped pairs containing, in order:
 /// - number of the base (`literal`)
 /// - associated internal variant name (`ident`)
@@ -117,6 +119,8 @@ macro_rules! for_each_supported_num_base {
     };
 }
 
+/// given a macro, call said macro with info pertaining to each numeric type supported by the lexer
+///
 /// calls provided macro with comma separated paren-wrapped pairs containing, in order:
 /// - associated rust type (`ty`)
 /// - corresponding [`NumberData`] variant name (`ident`)
@@ -221,6 +225,11 @@ macro_rules! _mk_numberdata_enum {
 for_each_supported_number_type!(_mk_numberdata_enum);
 
 /// given a macro, call said macro with info pertaining to each 'simple' (i.e. value-free) token.
+///
+/// calls provided macro with comma separated paren-wrapped pairs containing, in order:
+/// - a lowercase snake case identifier corresponding to the token (`ident`)
+/// - ... TODO ...
+/// - a string literal of the token itself
 macro_rules! for_each_simple_token {
     ($macro:tt) => {
         $macro!(
