@@ -98,8 +98,9 @@ $  # end of input (DO NOT include this in the lexer's copy of the regex)
 /// - number of the base (`literal`)
 /// - associated internal variant name (`ident`)
 macro_rules! for_each_supported_num_base {
-    ($macro:tt) => {
-        $macro!(
+    ($mrimpl:tt) => {
+        macro_rules! __foreach_tmp $mrimpl
+        __foreach_tmp!(
             (2, B2),
             (3, B3),
             (4, B4),
@@ -126,8 +127,9 @@ macro_rules! for_each_supported_num_base {
 /// - corresponding [`NumberData`] variant name (`ident`)
 /// - suffix used to mark literals as that type, as a string (`literal`)
 macro_rules! for_each_supported_number_type {
-    ($macro:tt) => {
-        $macro!(
+    ($mrimpl:tt) => {
+        macro_rules! __foreach_tmp $mrimpl
+        __foreach_tmp!(
             (u8, UnsignedInt8, "u8"),
             (u16, UnsignedInt16, "u16"),
             (u32, UnsignedInt32, "u32"),
@@ -148,7 +150,7 @@ fn number_token_callback<'source>(
     // TODO don't unwrap here
     let capture = number_token_pattern.captures(lex.slice()).unwrap();
 
-    macro_rules! _mk_numbase {
+    for_each_supported_num_base!({
         ($(($base:literal, $variant:ident)),*) => {
             enum NumBase {
                 $($variant,)*
@@ -169,10 +171,9 @@ fn number_token_callback<'source>(
                 }
             }
         };
-    }
-    for_each_supported_num_base!(_mk_numbase);
+    });
 
-    macro_rules! _mk_numtype {
+    for_each_supported_number_type!({
         ($(($typ:ty, $variant:ident, $suffix:literal)),*) => {
             enum NumType {
                 $($variant,)*
@@ -191,8 +192,7 @@ fn number_token_callback<'source>(
                 }
             }
         };
-    }
-    for_each_supported_number_type!(_mk_numtype);
+    });
 
     let base = match capture.base_prefix {
         None => NumBase::B10,
@@ -207,7 +207,7 @@ fn number_token_callback<'source>(
         .map_err(|_| ())
 }
 
-macro_rules! _mk_numberdata_enum {
+for_each_supported_number_type!({
     ($(($valtype:ty, $variantname:ident, $_suffixstr:literal)),*) => {
         #[derive(Debug, PartialEq, Eq, Clone)]
         pub(crate) enum NumberData {
@@ -221,8 +221,7 @@ macro_rules! _mk_numberdata_enum {
             }
         )*
     };
-}
-for_each_supported_number_type!(_mk_numberdata_enum);
+});
 
 /// given a macro, call said macro with info pertaining to each 'simple' (i.e. value-free) token.
 ///
@@ -231,8 +230,9 @@ for_each_supported_number_type!(_mk_numberdata_enum);
 /// - ... TODO ...
 /// - a string literal of the token itself
 macro_rules! for_each_simple_token {
-    ($macro:tt) => {
-        $macro!(
+    ($mrimpl:tt) => {
+        macro_rules! __foreach_tmp $mrimpl
+        __foreach_tmp!(
             (comma, $crate::lex::Token::Comma, ","),
             (colon, $crate::lex::Token::Colon, ":"),
             (semicolon, $crate::lex::Token::Semicolon, ";"),
@@ -275,12 +275,11 @@ mod tests {
     }
 
     mod simple_tokens {
-        macro_rules! simple_token_lex_test {
+        crate::lex::for_each_simple_token!({
             ($(($name:ident, $tok:path, $str:literal)),*) => {
                 $(lex_test!($name, $str, [$tok]);)*
             };
-        }
-        crate::lex::for_each_simple_token!(simple_token_lex_test);
+        });
     }
 
     mod numbers {

@@ -113,7 +113,7 @@ pub(crate) mod token {
             .parse_next(i)
     }
 
-    macro_rules! simple_token_parsefn {
+    crate::lex::for_each_simple_token!({
         ($(($fnname:ident, $token:path, $_:literal)),*) => {$(
             #[allow(unused)]
             pub(crate) fn $fnname<'source, I, E>(i: &mut I) -> PResult<(), E>
@@ -131,12 +131,11 @@ pub(crate) mod token {
                     .parse_next(i)
             }
         )*};
-    }
-    crate::lex::for_each_simple_token!(simple_token_parsefn);
+    });
 
     #[cfg(test)]
     mod tests {
-        macro_rules! simple_token_parsefn_tester {
+        crate::lex::for_each_simple_token!({
             ($(($fnname:ident, $token:path, $tokenstr:literal)),*) => {
                 $($crate::parse::tests::should_parse_test!(
                     $fnname,
@@ -144,8 +143,7 @@ pub(crate) mod token {
                     $tokenstr
                 );)*
             };
-        }
-        crate::lex::for_each_simple_token!(simple_token_parsefn_tester);
+        });
         crate::parse::tests::should_parse_to_test!(
             identifier,
             crate::parse::token::identifier,
