@@ -1,7 +1,4 @@
-use crate::{
-    ast::{self, YarnStr},
-    lex::Token,
-};
+use crate::ast;
 use winnow::{combinator::seq, PResult, Parser};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -144,18 +141,18 @@ pub(crate) mod token {
                 );)*
             };
         });
+        use crate::ast;
         crate::parse::tests::should_parse_to_test!(
             identifier,
             crate::parse::token::identifier,
             "foo",
-            Ok(crate::ast::Identifier::new("foo".into()))
+            Ok(ast::Identifier::new("foo".into()))
         );
-        use crate::ast::{Identifier, Number};
         crate::parse::tests::should_parse_to_test!(
             number,
             crate::parse::token::number,
             "10x12345u32",
-            Ok(Number {
+            Ok(ast::Number {
                 val: 12345u32.into()
             })
         );
