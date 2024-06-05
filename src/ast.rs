@@ -12,6 +12,15 @@ impl<'s> Identifier<'s> {
     }
 }
 
+impl<'s, Y> From<Y> for Identifier<'s>
+where
+    Y: Into<YarnStr<'s>>,
+{
+    fn from(value: Y) -> Self {
+        Self::new(value.into())
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Number {
     pub(crate) val: crate::lex::NumberData,

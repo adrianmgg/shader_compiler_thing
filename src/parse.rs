@@ -146,7 +146,9 @@ pub(crate) mod token {
             identifier,
             crate::parse::token::identifier,
             "foo",
-            Ok(ast::Identifier::new("foo".into()))
+            // (qualifying the call like this since this test shouldn't pass if for some reason the
+            //  return type wasn't an ast::Identifier but could still do `"foo".into()`)
+            Ok(Into::<ast::Identifier>::into("foo"))
         );
         crate::parse::tests::should_parse_to_test!(
             number,
