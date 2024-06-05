@@ -92,13 +92,14 @@ $  # end of input (DO NOT include this in the lexer's copy of the regex)
 "
 }
 
-/// given a macro, call said macro with info pertaining to each base/radix supported by the lexer
+/// given a macro_rules body, call said macro with info pertaining to each base/radix supported by the lexer
 ///
 /// calls provided macro with comma separated paren-wrapped pairs containing, in order:
 /// - number of the base (`literal`)
 /// - associated internal variant name (`ident`)
 macro_rules! for_each_supported_num_base {
     ($mrimpl:tt) => {
+        #[doc(hidden)]
         macro_rules! __foreach_tmp $mrimpl
         __foreach_tmp!(
             (2, B2),
@@ -120,7 +121,7 @@ macro_rules! for_each_supported_num_base {
     };
 }
 
-/// given a macro, call said macro with info pertaining to each numeric type supported by the lexer
+/// given a macro_rules body, call said macro with info pertaining to each numeric type supported by the lexer
 ///
 /// calls provided macro with comma separated paren-wrapped pairs containing, in order:
 /// - associated rust type (`ty`)
@@ -128,6 +129,7 @@ macro_rules! for_each_supported_num_base {
 /// - suffix used to mark literals as that type, as a string (`literal`)
 macro_rules! for_each_supported_number_type {
     ($mrimpl:tt) => {
+        #[doc(hidden)]
         macro_rules! __foreach_tmp $mrimpl
         __foreach_tmp!(
             (u8, UnsignedInt8, "u8"),
@@ -223,7 +225,7 @@ for_each_supported_number_type!({
     };
 });
 
-/// given a macro, call said macro with info pertaining to each 'simple' (i.e. value-free) token.
+/// given a macro_rules body, call said macro with info pertaining to each 'simple' (i.e. value-free) token.
 ///
 /// calls provided macro with comma separated paren-wrapped pairs containing, in order:
 /// - a lowercase snake case identifier corresponding to the token (`ident`)
@@ -231,6 +233,7 @@ for_each_supported_number_type!({
 /// - a string literal of the token itself
 macro_rules! for_each_simple_token {
     ($mrimpl:tt) => {
+        #[doc(hidden)]
         macro_rules! __foreach_tmp $mrimpl
         __foreach_tmp!(
             (comma, $crate::lex::Token::Comma, ","),
