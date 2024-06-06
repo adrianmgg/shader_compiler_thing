@@ -2,45 +2,49 @@ use logos::Logos;
 
 use crate::ast::YarnStr;
 
+/// given a macro_rules body, call said macro with info pertaining to each 'simple' (i.e. value-free) token.
+///
+/// calls provided macro with comma separated paren-wrapped pairs containing, in order:
+/// - a lowercase snake case identifier corresponding to the token (`ident`)
+/// - ... TODO ...
+/// - a string literal of the token itself
+macro_rules! for_each_simple_token {
+    ($mrimpl:tt) => {
+        #[doc(hidden)]
+        macro_rules! __for_each_simple_token__foreach_tmp $mrimpl
+        __for_each_simple_token__foreach_tmp!(
+            (comma, Comma, ","),
+            (colon, Colon, ":"),
+            (semicolon, Semicolon, ";"),
+            (rightarrow, RightArrow, "->"),
+            (singleequals, SingleEquals, "="),
+            (doubleequals, DoubleEquals, "=="),
+            (plus, Plus, "+"),
+            (minus, Minus, "-"),
+            (asterisk, Asterisk, "*"),
+            (slash, Slash, "/"),
+            (atsign, AtSign, "@"),
+            (openbracket, OpenBracket, "["),
+            (closebracket, CloseBracket, "]"),
+            (opencurly, OpenCurly, "{"),
+            (closecurly, CloseCurly, "}"),
+            (openparen, OpenParen, "("),
+            (closeparen, CloseParen, ")"),
+            (period, Period, ".")
+        );
+    };
+}
+pub(crate) use for_each_simple_token;
+
+for_each_simple_token!({
+    ($(($st_fnname:ident, $st_ident:ident, $st_str:literal)),*) => {
 #[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(skip r"[ \t\n\f]+")]
 pub(crate) enum Token<'source> {
-    #[token(",")]
-    Comma,
-    #[token(":")]
-    Colon,
-    #[token(";")]
-    Semicolon,
-    #[token("->")]
-    RightArrow,
-    #[token("=")]
-    SingleEquals,
-    #[token("==")]
-    DoubleEquals,
-    #[token("+")]
-    Plus,
-    #[token("-")]
-    Minus,
-    #[token("*")]
-    Asterisk,
-    #[token("/")]
-    Slash,
-    #[token("@")]
-    AtSign,
-    #[token("[")]
-    OpenBracket,
-    #[token("]")]
-    CloseBracket,
-    #[token("{")]
-    OpenCurly,
-    #[token("}")]
-    CloseCurly,
-    #[token("(")]
-    OpenParen,
-    #[token(")")]
-    CloseParen,
-    #[token(".")]
-    Period,
+    $(
+        #[token($st_str)]
+        $st_ident,
+    )*
 
     // TODO add underscore in number support
     // TODO add float support
@@ -67,6 +71,8 @@ pub(crate) enum Token<'source> {
     #[regex(r"[a-zA-Z_][a-zA-Z_0-9]*", identifier_callback)]
     Identifier(YarnStr<'source>),
 }
+};
+});
 
 fn identifier_callback<'a>(lex: &mut logos::Lexer<'a, Token<'a>>) -> YarnStr<'a> {
     YarnStr::new(lex.slice())
@@ -224,70 +230,6 @@ for_each_supported_number_type!({
                 }
             }
         )*
-    };
-});
-
-/// given a macro_rules body, call said macro with info pertaining to each 'simple' (i.e. value-free) token.
-///
-/// calls provided macro with comma separated paren-wrapped pairs containing, in order:
-/// - a lowercase snake case identifier corresponding to the token (`ident`)
-/// - ... TODO ...
-/// - a string literal of the token itself
-macro_rules! for_each_simple_token {
-    ($mrimpl:tt) => {
-        #[doc(hidden)]
-        macro_rules! __foreach_tmp $mrimpl
-        __foreach_tmp!(
-            (comma, Comma, ","),
-            (colon, Colon, ":"),
-            (semicolon, Semicolon, ";"),
-            (rightarrow, RightArrow, "->"),
-            (singleequals, SingleEquals, "="),
-            (doubleequals, DoubleEquals, "=="),
-            (plus, Plus, "+"),
-            (minus, Minus, "-"),
-            (asterisk, Asterisk, "*"),
-            (slash, Slash, "/"),
-            (atsign, AtSign, "@"),
-            (openbracket, OpenBracket, "["),
-            (closebracket, CloseBracket, "]"),
-            (opencurly, OpenCurly, "{"),
-            (closecurly, CloseCurly, "}"),
-            (openparen, OpenParen, "("),
-            (closeparen, CloseParen, ")"),
-            (period, Period, ".")
-        );
-    };
-}
-pub(crate) use for_each_simple_token;
-
-for_each_simple_token!({
-    ($(($st_fnname:ident, $st_ident:ident, $st_str:literal)),*) => {
-        pub(crate) enum TokenType {
-            Identifier,
-            Number,
-            $($st_ident,)*
-        }
-        impl<'source> winnow::stream::ContainsToken<Token<'source>> for TokenType {
-            #[inline]
-            fn contains_token(&self, token: Token<'source>) -> bool {
-                match self {
-                    $(Self::$st_ident => (token == Token::$st_ident),)*
-                    Self::Identifier => matches!(token, Token::Identifier(_)),
-                    Self::Number => matches!(token, Token::Number(_)),
-                }
-            }
-        }
-        impl<'source, 'a> winnow::stream::ContainsToken<&'a Token<'source>> for TokenType {
-            #[inline]
-            fn contains_token(&self, token: &'a Token<'source>) -> bool {
-                match self {
-                    $(Self::$st_ident => matches!(token, Token::$st_ident),)*
-                    Self::Identifier => matches!(token, Token::Identifier(_)),
-                    Self::Number => matches!(token, Token::Number(_)),
-                }
-            }
-        }
     };
 });
 
