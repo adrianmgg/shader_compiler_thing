@@ -6,8 +6,8 @@ use crate::ast::YarnStr;
 ///
 /// calls provided macro with comma separated paren-wrapped pairs containing, in order:
 /// - a lowercase snake case identifier corresponding to the token (`ident`)
-/// - ... TODO ...
-/// - a string literal of the token itself
+/// - an upper camel case identidier corresponding to the token (`ident`)
+/// - a string literal of the token itself (`literal`)
 macro_rules! for_each_simple_token {
     ($mrimpl:tt) => {
         #[doc(hidden)]
