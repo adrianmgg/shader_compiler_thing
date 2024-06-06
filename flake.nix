@@ -16,10 +16,12 @@
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
         rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+        nativeBuildInputs = [ rustToolchain ];
       in
       {
         devShells.default = pkgs.mkShell {
-          buildInputs = [ rustToolchain ];
+          inherit nativeBuildInputs;
+          packages = with pkgs; [ bacon ];
         };
       }
     );

@@ -26,7 +26,7 @@ pub(crate) struct Number {
     pub(crate) val: crate::lex::NumberData,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Function<'s> {
     pub(crate) name: Identifier<'s>,
     pub(crate) args: FunctionArgs<'s>,
@@ -37,17 +37,37 @@ pub(crate) struct Function<'s> {
 // TODO make this a proper struct instead probably
 pub(crate) type FunctionArgs<'s> = Vec<(Identifier<'s>, Type<'s>)>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Type<'s> {
     Named(Identifier<'s>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) struct StatementList<'s> {
     pub statements: Vec<Statement<'s>>,
 }
 
-#[derive(Debug)]
+impl<'s> FromIterator<Statement<'s>> for StatementList<'s> {
+    fn from_iter<T: IntoIterator<Item = Statement<'s>>>(iter: T) -> Self {
+        StatementList {
+            statements: Vec::from_iter(iter),
+        }
+    }
+}
+
+impl<'s> winnow::stream::Accumulate<Statement<'s>> for StatementList<'s> {
+    fn initial(capacity: Option<usize>) -> Self {
+        Self {
+            statements: Vec::initial(capacity),
+        }
+    }
+
+    fn accumulate(&mut self, acc: Statement<'s>) {
+        self.statements.accumulate(acc);
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Statement<'s> {
     Assign {
         target: LValue<'s>,
@@ -61,12 +81,16 @@ pub(crate) enum Statement<'s> {
     },
 }
 
-#[derive(Debug)]
-pub(crate) struct LValue<'s> {
-    _todo: std::marker::PhantomData<&'s ()>,
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum LValue<'s> {
+    Variable(Identifier<'s>),
+    Field {
+        target: Box<LValue<'s>>,
+        field_name: Identifier<'s>,
+    },
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Expression<'s> {
     VariableReference(Identifier<'s>),
     Number(Number),
@@ -82,7 +106,7 @@ pub(crate) enum Expression<'s> {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub(crate) enum BinaryInfixOp {
     /// addition
     Add,

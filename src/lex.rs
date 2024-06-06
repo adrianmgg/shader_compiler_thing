@@ -39,6 +39,8 @@ pub(crate) enum Token<'source> {
     OpenParen,
     #[token(")")]
     CloseParen,
+    #[token(".")]
+    Period,
 
     // TODO add underscore in number support
     // TODO add float support
@@ -236,27 +238,58 @@ macro_rules! for_each_simple_token {
         #[doc(hidden)]
         macro_rules! __foreach_tmp $mrimpl
         __foreach_tmp!(
-            (comma, $crate::lex::Token::Comma, ","),
-            (colon, $crate::lex::Token::Colon, ":"),
-            (semicolon, $crate::lex::Token::Semicolon, ";"),
-            (rightarrow, $crate::lex::Token::RightArrow, "->"),
-            (singleequals, $crate::lex::Token::SingleEquals, "="),
-            (doubleequals, $crate::lex::Token::DoubleEquals, "=="),
-            (plus, $crate::lex::Token::Plus, "+"),
-            (minus, $crate::lex::Token::Minus, "-"),
-            (asterisk, $crate::lex::Token::Asterisk, "*"),
-            (slash, $crate::lex::Token::Slash, "/"),
-            (atsign, $crate::lex::Token::AtSign, "@"),
-            (openbracket, $crate::lex::Token::OpenBracket, "["),
-            (closebracket, $crate::lex::Token::CloseBracket, "]"),
-            (opencurly, $crate::lex::Token::OpenCurly, "{"),
-            (closecurly, $crate::lex::Token::CloseCurly, "}"),
-            (openparen, $crate::lex::Token::OpenParen, "("),
-            (closeparen, $crate::lex::Token::CloseParen, ")")
+            (comma, Comma, ","),
+            (colon, Colon, ":"),
+            (semicolon, Semicolon, ";"),
+            (rightarrow, RightArrow, "->"),
+            (singleequals, SingleEquals, "="),
+            (doubleequals, DoubleEquals, "=="),
+            (plus, Plus, "+"),
+            (minus, Minus, "-"),
+            (asterisk, Asterisk, "*"),
+            (slash, Slash, "/"),
+            (atsign, AtSign, "@"),
+            (openbracket, OpenBracket, "["),
+            (closebracket, CloseBracket, "]"),
+            (opencurly, OpenCurly, "{"),
+            (closecurly, CloseCurly, "}"),
+            (openparen, OpenParen, "("),
+            (closeparen, CloseParen, ")"),
+            (period, Period, ".")
         );
     };
 }
 pub(crate) use for_each_simple_token;
+
+for_each_simple_token!({
+    ($(($st_fnname:ident, $st_ident:ident, $st_str:literal)),*) => {
+        pub(crate) enum TokenType {
+            Identifier,
+            Number,
+            $($st_ident,)*
+        }
+        impl<'source> winnow::stream::ContainsToken<Token<'source>> for TokenType {
+            #[inline]
+            fn contains_token(&self, token: Token<'source>) -> bool {
+                match self {
+                    $(Self::$st_ident => (token == Token::$st_ident),)*
+                    Self::Identifier => matches!(token, Token::Identifier(_)),
+                    Self::Number => matches!(token, Token::Number(_)),
+                }
+            }
+        }
+        impl<'source, 'a> winnow::stream::ContainsToken<&'a Token<'source>> for TokenType {
+            #[inline]
+            fn contains_token(&self, token: &'a Token<'source>) -> bool {
+                match self {
+                    $(Self::$st_ident => matches!(token, Token::$st_ident),)*
+                    Self::Identifier => matches!(token, Token::Identifier(_)),
+                    Self::Number => matches!(token, Token::Number(_)),
+                }
+            }
+        }
+    };
+});
 
 #[cfg(test)]
 mod tests {
@@ -279,8 +312,8 @@ mod tests {
 
     mod simple_tokens {
         crate::lex::for_each_simple_token!({
-            ($(($name:ident, $tok:path, $str:literal)),*) => {
-                $(lex_test!($name, $str, [$tok]);)*
+            ($(($name:ident, $tok:ident, $str:literal)),*) => {
+                $(lex_test!($name, $str, [crate::lex::Token::$tok]);)*
             };
         });
     }
