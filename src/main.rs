@@ -3,6 +3,7 @@ use logos::Logos;
 mod ast;
 mod lex;
 mod parse;
+mod types;
 
 fn main() {
     loop {

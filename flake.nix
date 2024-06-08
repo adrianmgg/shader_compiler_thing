@@ -21,7 +21,10 @@
       {
         devShells.default = pkgs.mkShell {
           inherit nativeBuildInputs;
-          packages = with pkgs; [ bacon ];
+          packages = with pkgs; [
+            bacon
+            cargo-expand
+          ];
         };
       }
     );
