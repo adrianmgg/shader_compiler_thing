@@ -138,7 +138,10 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
     };
     impl<'s, 'e> ASTVisitor<'s, types::TypeId> for PopulateFunctionTypesVisitor<'e> {
         type Error = ();
-        fn visit_typename_node(&mut self, r#type: &mut ast::TypeName<'s, types::TypeId>) -> Result<(), Self::Error> {
+        fn visit_typename_node(
+            &mut self,
+            r#type: &mut ast::TypeName<'s, types::TypeId>,
+        ) -> Result<(), Self::Error> {
             dbg!(r#type);
             Ok(())
         }

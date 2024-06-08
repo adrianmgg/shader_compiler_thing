@@ -188,7 +188,9 @@ fn function_args<'source>(
     .parse_next(i)
 }
 
-pub(crate) fn r#type<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::TypeName<'source, ()>> {
+pub(crate) fn r#type<'source>(
+    i: &mut &[LexResult<'source>],
+) -> PResult<ast::TypeName<'source, ()>> {
     trace(
         "type",
         alt((token::identifier.map(|id| ast::TypeName::Named {
