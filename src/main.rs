@@ -50,7 +50,7 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
     };
     impl<'s, 'e> ASTVisitor<'s, Option<types::TypeId>> for InitialTypesVisitor<'e> {
         type Error = ();
-        fn visit_expression(
+        fn visit_expression_node(
             &mut self,
             node: &mut ast::Expression<'s, Option<types::TypeId>>,
         ) -> Result<(), Self::Error> {
@@ -101,7 +101,7 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
     };
     impl<'s, 'e> ASTVisitor<'s, Option<types::TypeId>> for Phase2TypesVisitor<'e> {
         type Error = ();
-        fn visit_function(
+        fn visit_function_node(
             &mut self,
             node: &mut ast::Function<'s, Option<types::TypeId>>,
         ) -> Result<(), Self::Error> {

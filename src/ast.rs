@@ -142,16 +142,26 @@ pub(crate) enum BinaryInfixOp {
 
 pub(crate) trait ASTVisitor<'s, Ty> {
     type Error;
-    fn visit_function(&mut self, function: &mut Function<'s, Ty>) -> Result<(), Self::Error> {
+    /// called for each [`Function`] node in the tree
+    fn visit_function_node(&mut self, function: &mut Function<'s, Ty>) -> Result<(), Self::Error> {
         Ok(())
     }
-    fn visit_statement(&mut self, statement: &mut Statement<'s, Ty>) -> Result<(), Self::Error> {
+    /// called for each [`Statement`] node in the tree
+    fn visit_statement_node(
+        &mut self,
+        statement: &mut Statement<'s, Ty>,
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
-    fn visit_expression(&mut self, expression: &mut Expression<'s, Ty>) -> Result<(), Self::Error> {
+    /// called for each [`Expression`] node in the tree
+    fn visit_expression_node(
+        &mut self,
+        expression: &mut Expression<'s, Ty>,
+    ) -> Result<(), Self::Error> {
         Ok(())
     }
-    fn visit_typename_node(&mut self, r#type: &mut TypeName<'s, Ty>) -> Result<(), Self::Error> {
+    /// called for each [`TypeName`] node in the tree
+    fn visit_typename_node(&mut self, typename: &mut TypeName<'s, Ty>) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -235,7 +245,7 @@ impl<'s, Ty> VisitableNode<'s, Ty> for Function<'s, Ty> {
         &mut self,
         visitor: &mut Visitor,
     ) -> Result<(), Visitor::Error> {
-        visitor.visit_function(self)?;
+        visitor.visit_function_node(self)?;
         visitor.visit_typename_node(&mut self.return_type)?;
         self.args
             .iter_mut()
@@ -313,7 +323,7 @@ impl<'s, Ty> VisitableNode<'s, Ty> for Statement<'s, Ty> {
         &mut self,
         visitor: &mut Visitor,
     ) -> Result<(), Visitor::Error> {
-        visitor.visit_statement(self)?;
+        visitor.visit_statement_node(self)?;
         match self {
             Statement::Assign { target, value } => value.visit(visitor),
             Statement::Block { statements } => statements.visit(visitor),
@@ -368,7 +378,7 @@ impl<'s, Ty> VisitableNode<'s, Ty> for Expression<'s, Ty> {
         &mut self,
         visitor: &mut Visitor,
     ) -> Result<(), Visitor::Error> {
-        visitor.visit_expression(self)?;
+        visitor.visit_expression_node(self)?;
         match self {
             Expression::VariableReference { .. } => Ok(()),
             Expression::Number(_) => Ok(()),
