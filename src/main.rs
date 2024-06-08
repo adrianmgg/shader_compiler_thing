@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use logos::Logos;
 
 mod ast;
@@ -6,42 +8,142 @@ mod parse;
 mod types;
 
 fn main() {
-    loop {
-        let line = read_line().unwrap();
-
-        if line.starts_with(":quit") {
-            std::process::exit(0);
-        } else if line.starts_with(":lex ") {
-            let tokens = repl_do_lex(&line[":lex ".len()..]);
-            println!("{:?}", tokens);
-        } else {
-            let tokens = repl_do_lex(&line);
-            match tokens {
-                Err(span) => {
-                    eprintln!("lex error at {} thru {}", span.start, span.end);
-                }
-                Ok(tokens) => {
-                    repl_do_parse(tokens);
-                }
-            };
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    if !args.is_empty() {
+        for arg in args {
+            handle_line(&arg);
+        }
+    } else {
+        loop {
+            let line = read_line().unwrap();
+            handle_line(&line);
         }
     }
 }
 
-fn repl_do_parse(tokens: Vec<parse::LexResult>) {
-    use winnow::Parser;
-    let result = parse::expression.parse(&tokens);
-    match result {
-        Err(err) => {
-            eprintln!("parse error: {:?}", err);
+fn handle_line(line: &str) {
+    if line.starts_with(":quit") {
+        std::process::exit(0);
+    } else if let Some(line) = line.strip_prefix(":lex ") {
+        println!("{:?}", repl_do_lex(line));
+    } else if let Some(line) = line.strip_prefix(":parse ") {
+        repl_do_lex(line).and_then(repl_do_parse).inspect(|a| {
+            println!("{:?}", a);
+        });
+    } else {
+        if let Some(n) = repl_do_lex(line).and_then(repl_do_parse) {
+            repl_do_typecheck(n);
         }
-        Ok(a) => {
-            println!("{:#?}", a);
-        }
-    };
+    }
 }
 
-fn repl_do_lex(line: &str) -> Result<Vec<parse::LexResult<'_>>, std::ops::Range<usize>> {
+fn repl_do_typecheck(root: ast::Function<'_, ()>) {
+    use ast::{ASTVisitor, DirectlyTypedNode, Node, VisitableNode};
+
+    let mut engine = types::Engine::new();
+    let mut root = root
+        .upgrade(&|_type| -> Result<Option<types::TypeId>, ()> { Ok(None) })
+        .unwrap();
+
+    struct InitialTypesVisitor<'e> {
+        engine: &'e mut types::Engine,
+    };
+    struct Phase2TypesVisitor<'e> {
+        engine: &'e mut types::Engine,
+    };
+    impl<'s, 'e> ASTVisitor<'s, Option<types::TypeId>> for InitialTypesVisitor<'e> {
+        type Error = ();
+        fn visit_expression(
+            &mut self,
+            node: &mut ast::Expression<'s, Option<types::TypeId>>,
+        ) -> Result<(), Self::Error> {
+            match node {
+                ast::Expression::VariableReference(v) => {
+                    v.r#type = Some(self.engine.insert(types::TypeInfo::Unknown));
+                }
+                ast::Expression::Number(n) => {
+                    n.r#type = Some(self.engine.insert(types::TypeInfo::Integer(types::Integer {
+                        width: n.val.bit_width(),
+                        signed: n.val.is_signed(),
+                    })));
+                }
+                ast::Expression::BinaryInfix(ex) => {
+                    ex.r#type = Some(self.engine.insert(types::TypeInfo::Unknown));
+                }
+                ast::Expression::FunctionCall(_) => {}
+            };
+            Ok(())
+        }
+        fn visit_type(
+            &mut self,
+            node: &mut ast::Type<'s, Option<types::TypeId>>,
+        ) -> Result<(), Self::Error> {
+            match node {
+                ast::Type::Named { name, r#type } => {
+                    *r#type = Some(self.engine.insert(match name.name.as_slice() {
+                        "u32" => types::TypeInfo::Integer(types::Integer {
+                            width: 32,
+                            signed: false,
+                        }),
+                        _ => unimplemented!(),
+                    }));
+                }
+            };
+            Ok(())
+        }
+    }
+    // add typeids to functions in a second pass, since for that we need to gurantee the functions
+    // ret/args already got theirs and i'd rather this not be implicitly dependent on the visiting
+    // order
+    impl<'s, 'e> ASTVisitor<'s, Option<types::TypeId>> for Phase2TypesVisitor<'e> {
+        type Error = ();
+        fn visit_function(
+            &mut self,
+            node: &mut ast::Function<'s, Option<types::TypeId>>,
+        ) -> Result<(), Self::Error> {
+            node.r#type = Some(
+                self.engine
+                    .insert(types::TypeInfo::Function(types::Function {
+                        return_type: node.return_type.r#type().unwrap(),
+                        parameter_types: node
+                            .args
+                            .iter()
+                            .map(|(_, ty)| ty.r#type().unwrap())
+                            .collect(),
+                    })),
+            );
+            Ok(())
+        }
+    }
+    root.visit(&mut InitialTypesVisitor {
+        engine: &mut engine,
+    });
+    root.visit(&mut Phase2TypesVisitor {
+        engine: &mut engine,
+    });
+    let mut root = root
+        .upgrade(
+            &|r#type: Option<types::TypeId>| -> Result<types::TypeId, &'static str> {
+                r#type.ok_or("type data not populated correctly")
+            },
+        )
+        .unwrap();
+
+    println!("{:#?}", root);
+}
+
+fn repl_do_parse(tokens: Vec<parse::LexResult<'_>>) -> Option<ast::Function<'_, ()>> {
+    use winnow::Parser;
+    match parse::function.parse(&tokens) {
+        Err(err) => {
+            eprintln!("parse error: {:?}", err);
+            None
+        }
+        Ok(n) => Some(n),
+    }
+}
+
+fn repl_do_lex(line: &str) -> Option<Vec<parse::LexResult<'_>>> {
     let tokens: Result<Vec<parse::LexResult<'_>>, _> = lex::Token::lexer(line)
         .spanned()
         .map(|(tok, span)| match tok {
@@ -49,7 +151,13 @@ fn repl_do_lex(line: &str) -> Result<Vec<parse::LexResult<'_>>, std::ops::Range<
             Err(()) => Err(span),
         })
         .collect();
-    tokens
+    match tokens {
+        Ok(tokens) => Some(tokens),
+        Err(std::ops::Range { start, end }) => {
+            eprintln!("lex error at {start} thru {end}");
+            None
+        }
+    }
 }
 
 fn read_line() -> std::io::Result<impl std::ops::Deref<Target = str>> {

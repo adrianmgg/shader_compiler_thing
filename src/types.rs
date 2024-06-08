@@ -73,6 +73,10 @@ pub(crate) enum EngineError {
 }
 
 impl Engine {
+    pub(crate) fn new() -> Self {
+        Self { vars: Vec::new() }
+    }
+
     pub(crate) fn insert(&mut self, info: TypeInfo) -> TypeId {
         let id = TypeId(self.vars.len());
         self.vars.push(info);

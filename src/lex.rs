@@ -140,14 +140,14 @@ macro_rules! for_each_supported_number_type {
         #[doc(hidden)]
         macro_rules! __foreach_tmp $mrimpl
         __foreach_tmp!(
-            (u8, UnsignedInt8, "u8"),
-            (u16, UnsignedInt16, "u16"),
-            (u32, UnsignedInt32, "u32"),
-            (u64, UnsignedInt64, "u64"),
-            (i8, SignedInt8, "i8"),
-            (i16, SignedInt16, "i16"),
-            (i32, SignedInt32, "i32"),
-            (i64, SignedInt64, "i64")
+            (u8, UnsignedInt8, "u8", false, 8),
+            (u16, UnsignedInt16, "u16", false, 16),
+            (u32, UnsignedInt32, "u32", false, 32),
+            (u64, UnsignedInt64, "u64", false, 64),
+            (i8, SignedInt8, "i8", true, 8),
+            (i16, SignedInt16, "i16", true, 16),
+            (i32, SignedInt32, "i32", true, 32),
+            (i64, SignedInt64, "i64", true, 64)
         );
     };
 }
@@ -184,7 +184,7 @@ fn number_token_callback<'source>(
     });
 
     for_each_supported_number_type!({
-        ($(($typ:ty, $variant:ident, $suffix:literal)),*) => {
+        ($(($typ:ty, $variant:ident, $suffix:literal, $is_signed:literal, $bit_width:literal)),*) => {
             enum NumType {
                 $($variant,)*
             }
@@ -218,7 +218,7 @@ fn number_token_callback<'source>(
 }
 
 for_each_supported_number_type!({
-    ($(($valtype:ty, $variantname:ident, $_suffixstr:literal)),*) => {
+    ($(($valtype:ty, $variantname:ident, $_suffixstr:literal, $is_signed:literal, $bit_width:literal)),*) => {
         #[derive(Debug, PartialEq, Eq, Clone)]
         pub(crate) enum NumberData {
             $($variantname($valtype),)*
@@ -230,6 +230,18 @@ for_each_supported_number_type!({
                 }
             }
         )*
+        impl NumberData {
+            pub(crate) fn is_signed(&self) -> bool {
+                match self {
+                    $(Self::$variantname { .. } => $is_signed,)*
+                }
+            }
+            pub(crate) fn bit_width(&self) -> u32 {
+                match self {
+                    $(Self::$variantname { .. } => $bit_width,)*
+                }
+            }
+        }
     };
 });
 

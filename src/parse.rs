@@ -83,7 +83,7 @@ pub(crate) mod token {
         .parse_next(i)
     }
 
-    pub(crate) fn number<'source, I, E>(i: &mut I) -> PResult<ast::Number, E>
+    pub(crate) fn number<'source, I, E>(i: &mut I) -> PResult<ast::Number<()>, E>
     where
         I: winnow::stream::Stream<Token = LexResult<'source>> + winnow::stream::StreamIsPartial,
         E: winnow::error::ParserError<I>,
@@ -91,7 +91,7 @@ pub(crate) mod token {
         trace(
             "token::number",
             winnow::token::any.verify_map(|t: LexResult<'source>| match t.token {
-                Token::Number(n) => Some(ast::Number { val: n }),
+                Token::Number(n) => Some(ast::Number { val: n, r#type: () }),
                 _ => None,
             }),
         )
@@ -145,13 +145,16 @@ pub(crate) mod token {
             crate::parse::token::number,
             "10x12345u32",
             Ok(ast::Number {
-                val: 12345u32.into()
+                val: 12345u32.into(),
+                r#type: (),
             })
         );
     }
 }
 
-pub(crate) fn function<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Function<'source>> {
+pub(crate) fn function<'source>(
+    i: &mut &[LexResult<'source>],
+) -> PResult<ast::Function<'source, ()>> {
     use ast::Function;
     trace(
         "function",
@@ -165,12 +168,15 @@ pub(crate) fn function<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::F
             _: token::opencurly,
             statements: statement_list,
             _: token::closecurly,
+            r#type: (),
         }},
     )
     .parse_next(i)
 }
 
-fn function_args<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::FunctionArgs<'source>> {
+fn function_args<'source>(
+    i: &mut &[LexResult<'source>],
+) -> PResult<ast::FunctionArgs<'source, ()>> {
     trace(
         "function_args",
         separated(
@@ -182,13 +188,20 @@ fn function_args<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Functio
     .parse_next(i)
 }
 
-pub(crate) fn r#type<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Type<'source>> {
-    trace("type", alt((token::identifier.map(ast::Type::Named),))).parse_next(i)
+pub(crate) fn r#type<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Type<'source, ()>> {
+    trace(
+        "type",
+        alt((token::identifier.map(|id| ast::Type::Named {
+            name: id,
+            r#type: (),
+        }),)),
+    )
+    .parse_next(i)
 }
 
 pub(crate) fn statement_list<'source>(
     i: &mut &[LexResult<'source>],
-) -> PResult<ast::StatementList<'source>> {
+) -> PResult<ast::StatementList<'source, ()>> {
     trace(
         "statement_list",
         repeat(0.., terminated(statement, token::semicolon)),
@@ -198,7 +211,7 @@ pub(crate) fn statement_list<'source>(
 
 pub(crate) fn statement<'source>(
     i: &mut &[LexResult<'source>],
-) -> PResult<ast::Statement<'source>> {
+) -> PResult<ast::Statement<'source, ()>> {
     trace(
         "statement",
         alt((
@@ -234,8 +247,8 @@ pub(crate) fn lvalue<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::LVa
     .parse_next(i)
 }
 
-pub fn expression<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Expression<'source>> {
-    fn expr_prec0<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Expression<'source>> {
+pub fn expression<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Expression<'source, ()>> {
+    fn expr_prec0<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Expression<'source, ()>> {
         use expr_prec1 as next;
         trace(
             "expression::expr_prec0",
@@ -249,16 +262,19 @@ pub fn expression<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Expres
                 ),
                 next,
                 std::convert::identity,
-                |lhs, (op, rhs)| ast::Expression::BinaryInfix {
-                    lhs: Box::new(lhs),
-                    op,
-                    rhs: Box::new(rhs),
+                |lhs, (op, rhs)| {
+                    ast::Expression::BinaryInfix(ast::BinaryInfixExpr {
+                        lhs: Box::new(lhs),
+                        op,
+                        rhs: Box::new(rhs),
+                        r#type: (),
+                    })
                 },
             ),
         )
         .parse_next(i)
     }
-    fn expr_prec1<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Expression<'source>> {
+    fn expr_prec1<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Expression<'source, ()>> {
         use expr_prec2 as next;
         trace(
             "expression::expr_prec1",
@@ -273,33 +289,43 @@ pub fn expression<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Expres
                 ),
                 next,
                 std::convert::identity,
-                |lhs, (op, rhs)| ast::Expression::BinaryInfix {
-                    lhs: Box::new(lhs),
-                    op,
-                    rhs: Box::new(rhs),
+                |lhs, (op, rhs)| {
+                    ast::Expression::BinaryInfix(ast::BinaryInfixExpr {
+                        lhs: Box::new(lhs),
+                        op,
+                        rhs: Box::new(rhs),
+                        r#type: (),
+                    })
                 },
             ),
         )
         .parse_next(i)
     }
-    fn expr_prec2<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Expression<'source>> {
+    fn expr_prec2<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Expression<'source, ()>> {
         use expr_prec0 as start;
         trace(
             "expression::expr_prec2",
             alt((
                 trace(
                     "function call",
-                    seq! {ast::Expression::FunctionCall{
+                    seq! {ast::FunctionCallExpr{
                         function_name: token::identifier,
                         _: token::openparen,
                         // TODO support trailing comma
                         args: separated(0.., expression, token::comma),
                         _: token::closeparen,
-                    }},
+                        r#type: (),
+                    }}
+                    .map(ast::Expression::FunctionCall),
                 ),
                 trace(
                     "variable reference",
-                    token::identifier.map(ast::Expression::VariableReference),
+                    token::identifier.map(|name| {
+                        ast::Expression::VariableReference(ast::VariableReferenceExpr {
+                            name,
+                            r#type: (),
+                        })
+                    }),
                 ),
                 trace("number literal", token::number.map(ast::Expression::Number)),
                 trace(
@@ -364,7 +390,10 @@ mod tests {
         type_name,
         parse::r#type,
         "foo",
-        Ok(ast::Type::Named("foo".into()))
+        Ok(ast::Type::Named {
+            name: "foo".into(),
+            r#type: ()
+        })
     );
 
     should_parse_to_test!(
@@ -374,11 +403,27 @@ mod tests {
         Ok(ast::Function {
             name: "foo".into(),
             args: vec![
-                ("a".into(), ast::Type::Named("A".into())),
-                ("b".into(), ast::Type::Named("B".into()))
+                (
+                    "a".into(),
+                    ast::Type::Named {
+                        name: "A".into(),
+                        r#type: ()
+                    }
+                ),
+                (
+                    "b".into(),
+                    ast::Type::Named {
+                        name: "B".into(),
+                        r#type: ()
+                    }
+                )
             ],
-            return_type: ast::Type::Named("R".into()),
-            statements: ast::StatementList { statements: vec![] }
+            return_type: ast::Type::Named {
+                name: "R".into(),
+                r#type: ()
+            },
+            statements: ast::StatementList { statements: vec![] },
+            r#type: (),
         })
     );
 
@@ -389,23 +434,47 @@ mod tests {
         };
         Ok(BinaryInfix {
             lhs: BinaryInfix {
-                lhs: VariableReference("a".into()).into(),
+                lhs: VariableReference {
+                    name: "a".into(),
+                    r#type: (),
+                }
+                .into(),
                 op: Add,
                 rhs: BinaryInfix {
                     lhs: BinaryInfix {
-                        lhs: VariableReference("b".into()).into(),
+                        lhs: VariableReference {
+                            name: "b".into(),
+                            r#type: (),
+                        }
+                        .into(),
                         op: Multiply,
-                        rhs: VariableReference("c".into()).into(),
+                        rhs: VariableReference {
+                            name: "c".into(),
+                            r#type: (),
+                        }
+                        .into(),
+                        r#type: (),
                     }
                     .into(),
                     op: Divide,
-                    rhs: VariableReference("d".into()).into(),
+                    rhs: VariableReference {
+                        name: "d".into(),
+                        r#type: (),
+                    }
+                    .into(),
+                    r#type: (),
                 }
                 .into(),
+                r#type: (),
             }
             .into(),
             op: Subtract,
-            rhs: VariableReference("e".into()).into(),
+            rhs: VariableReference {
+                name: "e".into(),
+                r#type: (),
+            }
+            .into(),
+            r#type: (),
         })
     });
 
@@ -422,7 +491,10 @@ mod tests {
                 .into(),
                 field_name: "c".into()
             },
-            value: ast::Expression::VariableReference("d".into()),
+            value: ast::Expression::VariableReference {
+                name: "d".into(),
+                r#type: ()
+            },
         })
     );
 }
