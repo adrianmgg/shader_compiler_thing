@@ -31,16 +31,16 @@ pub(crate) struct Number<Ty> {
 pub(crate) struct Function<'s, Ty> {
     pub(crate) name: Identifier<'s>,
     pub(crate) args: FunctionArgs<'s, Ty>,
-    pub(crate) return_type: Type<'s, Ty>,
+    pub(crate) return_type: TypeName<'s, Ty>,
     pub(crate) statements: StatementList<'s, Ty>,
     pub(crate) r#type: Ty,
 }
 
 // TODO make this a proper struct instead probably
-pub(crate) type FunctionArgs<'s, Ty> = Vec<(Identifier<'s>, Type<'s, Ty>)>;
+pub(crate) type FunctionArgs<'s, Ty> = Vec<(Identifier<'s>, TypeName<'s, Ty>)>;
 
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum Type<'s, Ty> {
+pub(crate) enum TypeName<'s, Ty> {
     Named { name: Identifier<'s>, r#type: Ty },
 }
 
@@ -142,16 +142,16 @@ pub(crate) enum BinaryInfixOp {
 
 pub(crate) trait ASTVisitor<'s, Ty> {
     type Error;
-    fn visit_function(&mut self, node: &mut Function<'s, Ty>) -> Result<(), Self::Error> {
+    fn visit_function(&mut self, function: &mut Function<'s, Ty>) -> Result<(), Self::Error> {
         Ok(())
     }
-    fn visit_statement(&mut self, node: &mut Statement<'s, Ty>) -> Result<(), Self::Error> {
+    fn visit_statement(&mut self, statement: &mut Statement<'s, Ty>) -> Result<(), Self::Error> {
         Ok(())
     }
-    fn visit_expression(&mut self, node: &mut Expression<'s, Ty>) -> Result<(), Self::Error> {
+    fn visit_expression(&mut self, expression: &mut Expression<'s, Ty>) -> Result<(), Self::Error> {
         Ok(())
     }
-    fn visit_type(&mut self, node: &mut Type<'s, Ty>) -> Result<(), Self::Error> {
+    fn visit_typename_node(&mut self, r#type: &mut TypeName<'s, Ty>) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -236,23 +236,23 @@ impl<'s, Ty> VisitableNode<'s, Ty> for Function<'s, Ty> {
         visitor: &mut Visitor,
     ) -> Result<(), Visitor::Error> {
         visitor.visit_function(self)?;
-        visitor.visit_type(&mut self.return_type)?;
+        visitor.visit_typename_node(&mut self.return_type)?;
         self.args
             .iter_mut()
-            .try_for_each(|(_, r#type)| visitor.visit_type(r#type))?;
+            .try_for_each(|(_, r#type)| visitor.visit_typename_node(r#type))?;
         self.statements.visit(visitor)?;
         Ok(())
     }
 }
 
-impl<'s, Ty> Node<Ty> for Type<'s, Ty> {
-    type SelfWithTy<Ty2> = Type<'s, Ty2>;
+impl<'s, Ty> Node<Ty> for TypeName<'s, Ty> {
+    type SelfWithTy<Ty2> = TypeName<'s, Ty2>;
     fn upgrade<Ty2, E, U: NodeTypeUpgrader<Ty, Ty2, E>>(
         self,
         upgrader: &U,
     ) -> Result<Self::SelfWithTy<Ty2>, E> {
         match self {
-            Type::Named { name, r#type } => Ok(Type::Named {
+            TypeName::Named { name, r#type } => Ok(TypeName::Named {
                 name,
                 r#type: upgrader.upgrade(r#type)?,
             }),
@@ -405,10 +405,10 @@ impl<'s, Ty> DirectlyTypedNode<Ty> for Expression<'s, Ty> {
     }
 }
 
-impl<'s, Ty> DirectlyTypedNode<Ty> for Type<'s, Ty> {
+impl<'s, Ty> DirectlyTypedNode<Ty> for TypeName<'s, Ty> {
     fn r#type(&self) -> &Ty {
         match self {
-            Type::Named { r#type, .. } => r#type,
+            TypeName::Named { r#type, .. } => r#type,
         }
     }
 }

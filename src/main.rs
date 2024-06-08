@@ -48,9 +48,6 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
     struct InitialTypesVisitor<'e> {
         engine: &'e mut types::Engine,
     };
-    struct Phase2TypesVisitor<'e> {
-        engine: &'e mut types::Engine,
-    };
     impl<'s, 'e> ASTVisitor<'s, Option<types::TypeId>> for InitialTypesVisitor<'e> {
         type Error = ();
         fn visit_expression(
@@ -74,12 +71,12 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
             };
             Ok(())
         }
-        fn visit_type(
+        fn visit_typename_node(
             &mut self,
-            node: &mut ast::Type<'s, Option<types::TypeId>>,
+            node: &mut ast::TypeName<'s, Option<types::TypeId>>,
         ) -> Result<(), Self::Error> {
             match node {
-                ast::Type::Named { name, r#type } => {
+                ast::TypeName::Named { name, r#type } => {
                     *r#type = Some(self.engine.insert(match name.name.as_slice() {
                         "u32" => types::TypeInfo::Integer(types::Integer {
                             width: 32,
@@ -92,9 +89,16 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
             Ok(())
         }
     }
+    root.visit(&mut InitialTypesVisitor {
+        engine: &mut engine,
+    });
+
     // add typeids to functions in a second pass, since for that we need to gurantee the functions
     // ret/args already got theirs and i'd rather this not be implicitly dependent on the visiting
     // order
+    struct Phase2TypesVisitor<'e> {
+        engine: &'e mut types::Engine,
+    };
     impl<'s, 'e> ASTVisitor<'s, Option<types::TypeId>> for Phase2TypesVisitor<'e> {
         type Error = ();
         fn visit_function(
@@ -115,12 +119,12 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
             Ok(())
         }
     }
-    root.visit(&mut InitialTypesVisitor {
-        engine: &mut engine,
-    });
     root.visit(&mut Phase2TypesVisitor {
         engine: &mut engine,
     });
+
+    // strip off the `Option`s from our types
+    // (and in doing so, ensure every node has been given a type)
     let mut root = root
         .upgrade(
             &|r#type: Option<types::TypeId>| -> Result<types::TypeId, &'static str> {
@@ -128,6 +132,20 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
             },
         )
         .unwrap();
+
+    struct PopulateFunctionTypesVisitor<'e> {
+        engine: &'e mut types::Engine,
+    };
+    impl<'s, 'e> ASTVisitor<'s, types::TypeId> for PopulateFunctionTypesVisitor<'e> {
+        type Error = ();
+        fn visit_typename_node(&mut self, r#type: &mut ast::TypeName<'s, types::TypeId>) -> Result<(), Self::Error> {
+            dbg!(r#type);
+            Ok(())
+        }
+    }
+    root.visit(&mut PopulateFunctionTypesVisitor {
+        engine: &mut engine,
+    });
 
     println!("{:#?}", root);
 }

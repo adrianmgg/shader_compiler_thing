@@ -188,10 +188,10 @@ fn function_args<'source>(
     .parse_next(i)
 }
 
-pub(crate) fn r#type<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Type<'source, ()>> {
+pub(crate) fn r#type<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::TypeName<'source, ()>> {
     trace(
         "type",
-        alt((token::identifier.map(|id| ast::Type::Named {
+        alt((token::identifier.map(|id| ast::TypeName::Named {
             name: id,
             r#type: (),
         }),)),
@@ -390,7 +390,7 @@ mod tests {
         type_name,
         parse::r#type,
         "foo",
-        Ok(ast::Type::Named {
+        Ok(ast::TypeName::Named {
             name: "foo".into(),
             r#type: ()
         })
@@ -405,20 +405,20 @@ mod tests {
             args: vec![
                 (
                     "a".into(),
-                    ast::Type::Named {
+                    ast::TypeName::Named {
                         name: "A".into(),
                         r#type: ()
                     }
                 ),
                 (
                     "b".into(),
-                    ast::Type::Named {
+                    ast::TypeName::Named {
                         name: "B".into(),
                         r#type: ()
                     }
                 )
             ],
-            return_type: ast::Type::Named {
+            return_type: ast::TypeName::Named {
                 name: "R".into(),
                 r#type: ()
             },
@@ -429,53 +429,55 @@ mod tests {
 
     should_parse_to_test!(expr_precedence, parse::expression, "a + b * c / d - e", {
         use ast::{
+            BinaryInfixExpr,
             BinaryInfixOp::{Add, Divide, Multiply, Subtract},
             Expression::{BinaryInfix, VariableReference},
+            VariableReferenceExpr,
         };
-        Ok(BinaryInfix {
-            lhs: BinaryInfix {
-                lhs: VariableReference {
+        Ok(BinaryInfix(BinaryInfixExpr {
+            lhs: BinaryInfix(BinaryInfixExpr {
+                lhs: VariableReference(VariableReferenceExpr {
                     name: "a".into(),
                     r#type: (),
-                }
+                })
                 .into(),
                 op: Add,
-                rhs: BinaryInfix {
-                    lhs: BinaryInfix {
-                        lhs: VariableReference {
+                rhs: BinaryInfix(BinaryInfixExpr {
+                    lhs: BinaryInfix(BinaryInfixExpr {
+                        lhs: VariableReference(VariableReferenceExpr {
                             name: "b".into(),
                             r#type: (),
-                        }
+                        })
                         .into(),
                         op: Multiply,
-                        rhs: VariableReference {
+                        rhs: VariableReference(VariableReferenceExpr {
                             name: "c".into(),
                             r#type: (),
-                        }
+                        })
                         .into(),
                         r#type: (),
-                    }
+                    })
                     .into(),
                     op: Divide,
-                    rhs: VariableReference {
+                    rhs: VariableReference(VariableReferenceExpr {
                         name: "d".into(),
                         r#type: (),
-                    }
+                    })
                     .into(),
                     r#type: (),
-                }
+                })
                 .into(),
                 r#type: (),
-            }
+            })
             .into(),
             op: Subtract,
-            rhs: VariableReference {
+            rhs: VariableReference(VariableReferenceExpr {
                 name: "e".into(),
                 r#type: (),
-            }
+            })
             .into(),
             r#type: (),
-        })
+        }))
     });
 
     should_parse_to_test!(
@@ -491,10 +493,10 @@ mod tests {
                 .into(),
                 field_name: "c".into()
             },
-            value: ast::Expression::VariableReference {
+            value: ast::Expression::VariableReference(ast::VariableReferenceExpr {
                 name: "d".into(),
                 r#type: ()
-            },
+            }),
         })
     );
 }
