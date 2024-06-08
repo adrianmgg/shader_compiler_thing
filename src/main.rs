@@ -179,6 +179,7 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
                     self.engine
                         .unify(*binfix.lhs.r#type(), *binfix.rhs.r#type())?;
                     self.engine.unify(*binfix.lhs.r#type(), binfix.r#type)?;
+                    self.engine.unify(*binfix.rhs.r#type(), binfix.r#type)?;
                     Ok(())
                 }
                 ast::Expression::FunctionCall(_) => Ok(()),
