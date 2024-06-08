@@ -30,6 +30,7 @@ pub(crate) struct Function<Ty, Tyv> {
 // ================================================================================
 
 /// concrete type
+#[derive(Debug)]
 pub(crate) enum Type {
     Boolean,
     Integer(Integer),

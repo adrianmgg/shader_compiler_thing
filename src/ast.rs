@@ -168,10 +168,11 @@ pub(crate) trait ASTVisitor<'s, Ty> {
 
 pub(crate) trait Node<Ty> {
     type SelfWithTy<Ty2>;
-    fn upgrade<Ty2, E, U: NodeTypeUpgrader<Ty, Ty2, E>>(
+    fn upgrade_types<Ty2, E, U: NodeTypeUpgrader<Ty, Ty2, E>>(
         self,
         upgrader: &U,
     ) -> Result<Self::SelfWithTy<Ty2>, E>;
+    fn inspect_types<E, F: Fn(&Ty) -> Result<(), E>>(&self, inspector: &F) -> Result<(), E>;
 }
 
 pub(crate) trait VisitableNode<'s, Ty> {
@@ -200,7 +201,7 @@ where
 
 impl<Ty> Node<Ty> for Number<Ty> {
     type SelfWithTy<Ty2> = Number<Ty2>;
-    fn upgrade<Ty2, E, U: NodeTypeUpgrader<Ty, Ty2, E>>(
+    fn upgrade_types<Ty2, E, U: NodeTypeUpgrader<Ty, Ty2, E>>(
         self,
         upgrader: &U,
     ) -> Result<Self::SelfWithTy<Ty2>, E> {
@@ -208,6 +209,10 @@ impl<Ty> Node<Ty> for Number<Ty> {
             val: self.val,
             r#type: upgrader.upgrade(self.r#type)?,
         })
+    }
+
+    fn inspect_types<E, F: Fn(&Ty) -> Result<(), E>>(&self, inspector: &F) -> Result<(), E> {
+        inspector(&self.r#type)
     }
 }
 
@@ -222,7 +227,7 @@ impl<'s, Ty> VisitableNode<'s, Ty> for Number<Ty> {
 
 impl<'s, Ty> Node<Ty> for Function<'s, Ty> {
     type SelfWithTy<Ty2> = Function<'s, Ty2>;
-    fn upgrade<Ty2, E, U: NodeTypeUpgrader<Ty, Ty2, E>>(
+    fn upgrade_types<Ty2, E, U: NodeTypeUpgrader<Ty, Ty2, E>>(
         self,
         upgrader: &U,
     ) -> Result<Self::SelfWithTy<Ty2>, E> {
@@ -231,12 +236,22 @@ impl<'s, Ty> Node<Ty> for Function<'s, Ty> {
             args: self
                 .args
                 .into_iter()
-                .map(|(name, ty)| Ok((name, ty.upgrade(upgrader)?)))
+                .map(|(name, ty)| Ok((name, ty.upgrade_types(upgrader)?)))
                 .collect::<Result<_, _>>()?,
-            return_type: self.return_type.upgrade(upgrader)?,
-            statements: self.statements.upgrade(upgrader)?,
+            return_type: self.return_type.upgrade_types(upgrader)?,
+            statements: self.statements.upgrade_types(upgrader)?,
             r#type: upgrader.upgrade(self.r#type)?,
         })
+    }
+
+    fn inspect_types<E, F: Fn(&Ty) -> Result<(), E>>(&self, inspector: &F) -> Result<(), E> {
+        self.args
+            .iter()
+            .try_for_each(|(_, ty)| ty.inspect_types(inspector))?;
+        self.return_type.inspect_types(inspector)?;
+        self.statements.inspect_types(inspector)?;
+        inspector(&self.r#type)?;
+        Ok(())
     }
 }
 
@@ -257,7 +272,7 @@ impl<'s, Ty> VisitableNode<'s, Ty> for Function<'s, Ty> {
 
 impl<'s, Ty> Node<Ty> for TypeName<'s, Ty> {
     type SelfWithTy<Ty2> = TypeName<'s, Ty2>;
-    fn upgrade<Ty2, E, U: NodeTypeUpgrader<Ty, Ty2, E>>(
+    fn upgrade_types<Ty2, E, U: NodeTypeUpgrader<Ty, Ty2, E>>(
         self,
         upgrader: &U,
     ) -> Result<Self::SelfWithTy<Ty2>, E> {
@@ -268,11 +283,15 @@ impl<'s, Ty> Node<Ty> for TypeName<'s, Ty> {
             }),
         }
     }
+
+    fn inspect_types<E, F: Fn(&Ty) -> Result<(), E>>(&self, inspector: &F) -> Result<(), E> {
+        inspector(self.r#type())
+    }
 }
 
 impl<'s, Ty> Node<Ty> for StatementList<'s, Ty> {
     type SelfWithTy<Ty2> = StatementList<'s, Ty2>;
-    fn upgrade<Ty2, E, U: NodeTypeUpgrader<Ty, Ty2, E>>(
+    fn upgrade_types<Ty2, E, U: NodeTypeUpgrader<Ty, Ty2, E>>(
         self,
         upgrader: &U,
     ) -> Result<Self::SelfWithTy<Ty2>, E> {
@@ -280,9 +299,15 @@ impl<'s, Ty> Node<Ty> for StatementList<'s, Ty> {
             statements: self
                 .statements
                 .into_iter()
-                .map(|stmt| stmt.upgrade(upgrader))
+                .map(|stmt| stmt.upgrade_types(upgrader))
                 .collect::<Result<_, _>>()?,
         })
+    }
+
+    fn inspect_types<E, F: Fn(&Ty) -> Result<(), E>>(&self, inspector: &F) -> Result<(), E> {
+        self.statements
+            .iter()
+            .try_for_each(|stmt| stmt.inspect_types(inspector))
     }
 }
 
@@ -299,22 +324,30 @@ impl<'s, Ty> VisitableNode<'s, Ty> for StatementList<'s, Ty> {
 
 impl<'s, Ty> Node<Ty> for Statement<'s, Ty> {
     type SelfWithTy<Ty2> = Statement<'s, Ty2>;
-    fn upgrade<Ty2, E, U: NodeTypeUpgrader<Ty, Ty2, E>>(
+    fn upgrade_types<Ty2, E, U: NodeTypeUpgrader<Ty, Ty2, E>>(
         self,
         upgrader: &U,
     ) -> Result<Self::SelfWithTy<Ty2>, E> {
         Ok(match self {
             Statement::Assign { target, value } => Statement::Assign {
                 target,
-                value: value.upgrade(upgrader)?,
+                value: value.upgrade_types(upgrader)?,
             },
             Statement::Block { statements } => Statement::Block {
-                statements: statements.upgrade(upgrader)?,
+                statements: statements.upgrade_types(upgrader)?,
             },
             Statement::Expr { expr } => Statement::Expr {
-                expr: expr.upgrade(upgrader)?,
+                expr: expr.upgrade_types(upgrader)?,
             },
         })
+    }
+
+    fn inspect_types<E, F: Fn(&Ty) -> Result<(), E>>(&self, inspector: &F) -> Result<(), E> {
+        match self {
+            Statement::Assign { target, value } => value.inspect_types(inspector),
+            Statement::Block { statements } => statements.inspect_types(inspector),
+            Statement::Expr { expr } => expr.inspect_types(inspector),
+        }
     }
 }
 
@@ -334,7 +367,7 @@ impl<'s, Ty> VisitableNode<'s, Ty> for Statement<'s, Ty> {
 
 impl<'s, Ty> Node<Ty> for Expression<'s, Ty> {
     type SelfWithTy<Ty2> = Expression<'s, Ty2>;
-    fn upgrade<Ty2, E, U: NodeTypeUpgrader<Ty, Ty2, E>>(
+    fn upgrade_types<Ty2, E, U: NodeTypeUpgrader<Ty, Ty2, E>>(
         self,
         upgrader: &U,
     ) -> Result<Self::SelfWithTy<Ty2>, E> {
@@ -345,16 +378,16 @@ impl<'s, Ty> Node<Ty> for Expression<'s, Ty> {
                     r#type: upgrader.upgrade(r#type)?,
                 })
             }
-            Expression::Number(n) => Expression::Number(n.upgrade(upgrader)?),
+            Expression::Number(n) => Expression::Number(n.upgrade_types(upgrader)?),
             Expression::BinaryInfix(BinaryInfixExpr {
                 lhs,
                 op,
                 rhs,
                 r#type,
             }) => Expression::BinaryInfix(BinaryInfixExpr {
-                lhs: Box::new(lhs.upgrade(upgrader)?),
+                lhs: Box::new(lhs.upgrade_types(upgrader)?),
                 op,
-                rhs: Box::new(rhs.upgrade(upgrader)?),
+                rhs: Box::new(rhs.upgrade_types(upgrader)?),
                 r#type: upgrader.upgrade(r#type)?,
             }),
             Expression::FunctionCall(FunctionCallExpr {
@@ -365,11 +398,30 @@ impl<'s, Ty> Node<Ty> for Expression<'s, Ty> {
                 function_name,
                 args: args
                     .into_iter()
-                    .map(|n| n.upgrade(upgrader))
+                    .map(|n| n.upgrade_types(upgrader))
                     .collect::<Result<_, _>>()?,
                 r#type: upgrader.upgrade(r#type)?,
             }),
         })
+    }
+
+    fn inspect_types<E, F: Fn(&Ty) -> Result<(), E>>(&self, inspector: &F) -> Result<(), E> {
+        match self {
+            Expression::VariableReference(vr) => inspector(&vr.r#type),
+            Expression::Number(num) => num.inspect_types(inspector),
+            Expression::BinaryInfix(binfix) => {
+                binfix.lhs.inspect_types(inspector)?;
+                binfix.rhs.inspect_types(inspector)?;
+                inspector(&binfix.r#type)
+            }
+            Expression::FunctionCall(funccall) => {
+                funccall
+                    .args
+                    .iter()
+                    .try_for_each(|arg| arg.inspect_types(inspector))?;
+                inspector(&funccall.r#type)
+            }
+        }
     }
 }
 

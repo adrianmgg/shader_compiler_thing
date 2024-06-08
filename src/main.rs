@@ -42,7 +42,7 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
 
     let mut engine = types::Engine::new();
     let mut root = root
-        .upgrade(&|_type| -> Result<Option<types::TypeId>, ()> { Ok(None) })
+        .upgrade_types(&|_type| -> Result<Option<types::TypeId>, ()> { Ok(None) })
         .unwrap();
 
     struct InitialTypesVisitor<'e> {
@@ -78,9 +78,37 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
             match node {
                 ast::TypeName::Named { name, r#type } => {
                     *r#type = Some(self.engine.insert(match name.name.as_slice() {
+                        "u8" => types::TypeInfo::Integer(types::Integer {
+                            width: 8,
+                            signed: false,
+                        }),
+                        "u16" => types::TypeInfo::Integer(types::Integer {
+                            width: 16,
+                            signed: false,
+                        }),
                         "u32" => types::TypeInfo::Integer(types::Integer {
                             width: 32,
                             signed: false,
+                        }),
+                        "u64" => types::TypeInfo::Integer(types::Integer {
+                            width: 64,
+                            signed: false,
+                        }),
+                        "i8" => types::TypeInfo::Integer(types::Integer {
+                            width: 8,
+                            signed: true,
+                        }),
+                        "i16" => types::TypeInfo::Integer(types::Integer {
+                            width: 16,
+                            signed: true,
+                        }),
+                        "i32" => types::TypeInfo::Integer(types::Integer {
+                            width: 32,
+                            signed: true,
+                        }),
+                        "i64" => types::TypeInfo::Integer(types::Integer {
+                            width: 64,
+                            signed: true,
                         }),
                         _ => unimplemented!(),
                     }));
@@ -126,31 +154,53 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
     // strip off the `Option`s from our types
     // (and in doing so, ensure every node has been given a type)
     let mut root = root
-        .upgrade(
+        .upgrade_types(
             &|r#type: Option<types::TypeId>| -> Result<types::TypeId, &'static str> {
                 r#type.ok_or("type data not populated correctly")
             },
         )
         .unwrap();
 
-    struct PopulateFunctionTypesVisitor<'e> {
+    struct UnifyTypesPass<'e> {
         engine: &'e mut types::Engine,
     };
-    impl<'s, 'e> ASTVisitor<'s, types::TypeId> for PopulateFunctionTypesVisitor<'e> {
-        type Error = ();
-        fn visit_typename_node(
+    impl<'s, 'e> ASTVisitor<'s, types::TypeId> for UnifyTypesPass<'e> {
+        type Error = types::EngineError;
+        fn visit_expression_node(
             &mut self,
-            r#type: &mut ast::TypeName<'s, types::TypeId>,
+            expression: &mut ast::Expression<'s, types::TypeId>,
         ) -> Result<(), Self::Error> {
-            dbg!(r#type);
-            Ok(())
+            match expression {
+                ast::Expression::VariableReference(_) => Ok(()),
+                ast::Expression::Number(_) => Ok(()),
+                ast::Expression::BinaryInfix(binfix) => {
+                    // TODO for now this just assumes all these exprs are always valid
+                    // and always (T, T) -> T
+                    self.engine
+                        .unify(*binfix.lhs.r#type(), *binfix.rhs.r#type())?;
+                    self.engine.unify(*binfix.lhs.r#type(), binfix.r#type)?;
+                    Ok(())
+                }
+                ast::Expression::FunctionCall(_) => Ok(()),
+            }
         }
     }
-    root.visit(&mut PopulateFunctionTypesVisitor {
+    root.visit(&mut UnifyTypesPass {
         engine: &mut engine,
     });
 
-    println!("{:#?}", root);
+    // root.inspect_types(&|ty| -> Result<(), ()> {
+    //     // hello world
+    //     dbg!(engine.reconstruct(*ty));
+    //     Ok(())
+    // })
+    // .unwrap();
+
+    let root = root
+        .upgrade_types(&|ty| engine.reconstruct(ty))
+        .expect("some types failed to reconstruct");
+
+    println!("{:#?}", &root);
 }
 
 fn repl_do_parse(tokens: Vec<parse::LexResult<'_>>) -> Option<ast::Function<'_, ()>> {
