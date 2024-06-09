@@ -154,7 +154,7 @@ pub(crate) mod token {
 
 pub(crate) fn function<'source>(
     i: &mut &[LexResult<'source>],
-) -> PResult<ast::Function<'source, ()>> {
+) -> PResult<ast::Function<'source, (), ()>> {
     use ast::Function;
     trace(
         "function",
@@ -169,6 +169,7 @@ pub(crate) fn function<'source>(
             statements: statement_list,
             _: token::closecurly,
             r#type: (),
+            scope: (),
         }},
     )
     .parse_next(i)
@@ -203,7 +204,7 @@ pub(crate) fn r#type<'source>(
 
 pub(crate) fn statement_list<'source>(
     i: &mut &[LexResult<'source>],
-) -> PResult<ast::StatementList<'source, ()>> {
+) -> PResult<ast::StatementList<'source, (), ()>> {
     trace(
         "statement_list",
         repeat(0.., terminated(statement, token::semicolon)),
@@ -213,7 +214,7 @@ pub(crate) fn statement_list<'source>(
 
 pub(crate) fn statement<'source>(
     i: &mut &[LexResult<'source>],
-) -> PResult<ast::Statement<'source, ()>> {
+) -> PResult<ast::Statement<'source, (), ()>> {
     trace(
         "statement",
         alt((
@@ -226,6 +227,7 @@ pub(crate) fn statement<'source>(
                 _: token::opencurly,
                 statements: statement_list,
                 _: token::closecurly,
+                scope: (),
             }),
             seq!(ast::Statement::Expr { expr: expression }),
         )),
@@ -341,6 +343,33 @@ pub fn expression<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Expres
     trace("expression", expr_prec0).parse_next(i)
 }
 
+pub fn document<'source>(i: &mut &[LexResult<'source>]) -> PResult<ast::Document<'source, (), ()>> {
+    enum TopLevelAcceptableNode<'a, Ty, Scope> {
+        Function(ast::Function<'a, Ty, Scope>),
+    }
+
+    repeat(
+        0..,
+        alt((
+            //
+            function.map(TopLevelAcceptableNode::Function),
+        )),
+    )
+    .fold(
+        || ast::Document {
+            functions: Default::default(),
+            scope: (),
+        },
+        |mut doc, item| {
+            match item {
+                TopLevelAcceptableNode::Function(f) => doc.functions.push(f),
+            }
+            doc
+        },
+    )
+    .parse_next(i)
+}
+
 #[cfg(test)]
 mod tests {
     macro_rules! should_parse_test {
@@ -424,8 +453,12 @@ mod tests {
                 name: "R".into(),
                 r#type: ()
             },
-            statements: ast::StatementList { statements: vec![] },
+            statements: ast::StatementList {
+                statements: vec![],
+                scope: ()
+            },
             r#type: (),
+            scope: (),
         })
     );
 

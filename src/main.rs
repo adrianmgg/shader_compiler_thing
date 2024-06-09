@@ -37,22 +37,33 @@ fn handle_line(line: &str) {
     }
 }
 
-fn repl_do_typecheck(root: ast::Function<'_, ()>) {
+fn repl_do_typecheck(root: ast::Document<'_, (), ()>) {
     use ast::{ASTVisitor, DirectlyTypedNode, Node, VisitableNode};
+
+    let mut foo: usize = 0;
 
     let mut engine = types::Engine::new();
     let mut root = root
-        .upgrade_types(&|_type| -> Result<Option<types::TypeId>, ()> { Ok(None) })
+        .upgrade(
+            &mut |_type| -> Result<Option<types::TypeId>, ()> { Ok(None) },
+            // TODO placeholder, this'll be some kind of handle/id into some scope manager thing
+            &mut |_scope| {
+                let new_scope = foo;
+                foo += 1;
+                Ok(new_scope)
+            },
+        )
         .unwrap();
 
     struct InitialTypesVisitor<'e> {
         engine: &'e mut types::Engine,
     };
-    impl<'s, 'e> ASTVisitor<'s, Option<types::TypeId>> for InitialTypesVisitor<'e> {
+    impl<'s, 'e> ASTVisitor<'s, Option<types::TypeId>, usize> for InitialTypesVisitor<'e> {
         type Error = ();
         fn visit_expression_node(
             &mut self,
             node: &mut ast::Expression<'s, Option<types::TypeId>>,
+            scope: &usize,
         ) -> Result<(), Self::Error> {
             match node {
                 ast::Expression::VariableReference(v) => {
@@ -74,6 +85,7 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
         fn visit_typename_node(
             &mut self,
             node: &mut ast::TypeName<'s, Option<types::TypeId>>,
+            scope: &usize,
         ) -> Result<(), Self::Error> {
             match node {
                 ast::TypeName::Named { name, r#type } => {
@@ -127,11 +139,12 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
     struct Phase2TypesVisitor<'e> {
         engine: &'e mut types::Engine,
     };
-    impl<'s, 'e> ASTVisitor<'s, Option<types::TypeId>> for Phase2TypesVisitor<'e> {
+    impl<'s, 'e> ASTVisitor<'s, Option<types::TypeId>, usize> for Phase2TypesVisitor<'e> {
         type Error = ();
         fn visit_function_node(
             &mut self,
-            node: &mut ast::Function<'s, Option<types::TypeId>>,
+            node: &mut ast::Function<'s, Option<types::TypeId>, usize>,
+            scope: &usize,
         ) -> Result<(), Self::Error> {
             node.r#type = Some(
                 self.engine
@@ -155,7 +168,7 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
     // (and in doing so, ensure every node has been given a type)
     let mut root = root
         .upgrade_types(
-            &|r#type: Option<types::TypeId>| -> Result<types::TypeId, &'static str> {
+            &mut |r#type: Option<types::TypeId>| -> Result<types::TypeId, &'static str> {
                 r#type.ok_or("type data not populated correctly")
             },
         )
@@ -164,11 +177,12 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
     struct UnifyTypesPass<'e> {
         engine: &'e mut types::Engine,
     };
-    impl<'s, 'e> ASTVisitor<'s, types::TypeId> for UnifyTypesPass<'e> {
+    impl<'s, 'e> ASTVisitor<'s, types::TypeId, usize> for UnifyTypesPass<'e> {
         type Error = types::EngineError;
         fn visit_expression_node(
             &mut self,
             expression: &mut ast::Expression<'s, types::TypeId>,
+            scope: &usize,
         ) -> Result<(), Self::Error> {
             match expression {
                 ast::Expression::VariableReference(_) => Ok(()),
@@ -198,15 +212,15 @@ fn repl_do_typecheck(root: ast::Function<'_, ()>) {
     // .unwrap();
 
     let root = root
-        .upgrade_types(&|ty| engine.reconstruct(ty))
+        .upgrade_types(&mut |ty| engine.reconstruct(ty))
         .expect("some types failed to reconstruct");
 
     println!("{:#?}", &root);
 }
 
-fn repl_do_parse(tokens: Vec<parse::LexResult<'_>>) -> Option<ast::Function<'_, ()>> {
+fn repl_do_parse(tokens: Vec<parse::LexResult<'_>>) -> Option<ast::Document<'_, (), ()>> {
     use winnow::Parser;
-    match parse::function.parse(&tokens) {
+    match parse::document.parse(&tokens) {
         Err(err) => {
             eprintln!("parse error: {:?}", err);
             None
